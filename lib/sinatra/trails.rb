@@ -22,17 +22,68 @@ module Sinatra
       end
     end
 
-    class Scope
-      def initialize *namespaces, &block
-        @namespaces, @block, @routes, @scopes = namespaces.flatten, block, [], []
-      end
-
+    module Matching
       def match routes
         @routes += routes.map { |name, route| Route.new(route, name, *@namespaces) }
       end
 
-      def namespace name, &block
-        @routes += Scope.new(*@namespaces.push(name), &block).generate_routes!
+      def namespace *names, &block
+        @routes += Scope.new(*(@namespaces + names), &block).generate_routes!
+      end
+    end
+
+    class Resources
+      include Matching
+      attr_accessor :plural_name, :singular_name
+
+      def initialize name, opts = {}
+        @name, @namespaces, @routes, @block = name, [], []
+        @plural_name   = @name.to_s
+        @singular_name = ActiveSupport::Inflector.singularize @plural_name
+        @parent        = opts.delete(:parent)
+      end
+
+      def generate_nested
+        plural_name   = "#{@parent.singular_name}_#{@plural_name}"
+        singular_name = "#{@parent.singular_name}_#{@singular_name}"
+        namespace @parent.plural_name, ":#{@parent.singular_name}_id", @plural_name do
+          match plural_name => '/', "new_#{singular_name}" => '/new' 
+          match singular_name => '/:id', "edit_#{singular_name}" => '/:id/edit'
+        end
+      end
+
+      def generate_base
+        plural_name, singular_name = @plural_name, @singular_name
+        namespace plural_name do
+          match plural_name => '/', "new_#{singular_name}" => '/new'
+          match singular_name => '/:id', "edit_#{singular_name}" => '/:id/edit'
+        end
+      end
+
+      def generate_routes! &block
+        if @parent
+          generate_nested
+        else
+          generate_base
+        end
+        instance_eval(&block) if block_given?
+        @routes
+      end
+
+      def resources name, opts = {}, &block
+        @routes += Resources.new(name, opts.merge(:parent => self)).generate_routes!(&block)#.tap { |routes| puts routes.inspect }
+      end
+    end
+
+    class Scope
+      include Matching
+
+      def initialize *namespaces, &block
+        @namespaces, @block, @routes = namespaces.flatten, block, []
+      end
+
+      def resources name, opts = {}, &block
+        @routes += Resources.new(name, opts).generate_routes!(&block)# .tap { |routes| puts routes.inspect }
       end
 
       def generate_routes!
@@ -51,6 +102,10 @@ module Sinatra
     
     def match routes
       namespace(nil) { match routes }
+    end
+
+    def resources plural_name, &block
+      namespace(nil) { resources plural_name, &block }
     end
 
     def namespace name, &block
