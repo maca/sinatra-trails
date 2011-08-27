@@ -40,32 +40,36 @@ module Sinatra
         @name, @namespaces, @routes, @block = name, [], []
         @plural_name   = @name.to_s
         @singular_name = ActiveSupport::Inflector.singularize @plural_name
-        @parent        = opts.delete(:parent)
+        @parent        = opts[:parent]
+        @shallow       = opts[:shallow]
+        @opts          = opts
+      end
+
+      def shallow?
+        @shallow
       end
 
       def generate_nested
         plural_name   = "#{@parent.singular_name}_#{@plural_name}"
         singular_name = "#{@parent.singular_name}_#{@singular_name}"
+        shallow       = @parent.shallow?
         namespace @parent.plural_name, ":#{@parent.singular_name}_id", @plural_name do
           match plural_name => '/', "new_#{singular_name}" => '/new' 
-          match singular_name => '/:id', "edit_#{singular_name}" => '/:id/edit'
+          match singular_name => '/:id', "edit_#{singular_name}" => '/:id/edit' unless shallow
         end
       end
 
       def generate_base
-        plural_name, singular_name = @plural_name, @singular_name
+        plural_name, singular_name, parent = @plural_name, @singular_name, @parent
         namespace plural_name do
-          match plural_name => '/', "new_#{singular_name}" => '/new'
-          match singular_name => '/:id', "edit_#{singular_name}" => '/:id/edit'
+          match plural_name => '/', "new_#{singular_name}" => '/new' unless parent
+          match singular_name => '/:id', "edit_#{singular_name}" => '/:id/edit' if !parent || (parent && parent.shallow?)
         end
       end
 
       def generate_routes! &block
-        if @parent
-          generate_nested
-        else
-          generate_base
-        end
+        generate_nested if @parent
+        generate_base
         instance_eval(&block) if block_given?
         @routes
       end
@@ -104,8 +108,8 @@ module Sinatra
       namespace(nil) { match routes }
     end
 
-    def resources plural_name, &block
-      namespace(nil) { resources plural_name, &block }
+    def resources plural_name, opts = {}, &block
+      namespace(nil) { resources plural_name, opts, &block }
     end
 
     def namespace name, &block

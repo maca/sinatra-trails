@@ -122,22 +122,28 @@ describe 'trails' do
       it { @app.route_for(:new_post_comment).should  == '/posts/:post_id/comments/new' }
       it { @app.route_for(:post_comment).should      == '/posts/:post_id/comments/:id' }
       it { @app.route_for(:edit_post_comment).should == '/posts/:post_id/comments/:id/edit' }
+      it { lambda{ @app.route_for(:comment) }.should raise_error Sinatra::Trails::RouteNotDefined }
+      it { lambda{ @app.route_for(:edit_comment) }.should raise_error Sinatra::Trails::RouteNotDefined }
     end
 
-    # describe 'shallow nested resources' do
-    #   before do
-    #     @app = app
-    #     @app.resources :posts, :shallow => true do
-    #       resources :comments
-    #     end
-    #   end
+    describe 'shallow nested resources' do
+      before do
+        @app = app
+        @app.resources :posts, :shallow => true do
+          resources :comments
+        end
+      end
 
-    #   # it_should_behave_like 'generates routes for post resources'
-    #   it { @app.route_for(:post_comments).should     == '/posts/:post_id/comments' }
-    #   it { @app.route_for(:new_post_comment).should  == '/posts/:post_id/comments/new' }
-    #   it { @app.route_for(:comment).should           == '/comments/:id' }
-    #   it { @app.route_for(:edit_comment).should      == '/comments/:id/edit' }
-    # end
+      it_should_behave_like 'generates routes for post resources'
+      it { @app.route_for(:post_comments).should     == '/posts/:post_id/comments' }
+      it { @app.route_for(:new_post_comment).should  == '/posts/:post_id/comments/new' }
+      it { @app.route_for(:comment).should           == '/comments/:id' }
+      it { @app.route_for(:edit_comment).should      == '/comments/:id/edit' }
+      it { lambda{ @app.route_for(:post_comment) }.should raise_error Sinatra::Trails::RouteNotDefined }
+      it { lambda{ @app.route_for(:edit_post_comment) }.should raise_error Sinatra::Trails::RouteNotDefined }
+      it { lambda{ @app.route_for(:new_comment) }.should raise_error Sinatra::Trails::RouteNotDefined }
+      it { lambda{ @app.route_for(:comments) }.should raise_error Sinatra::Trails::RouteNotDefined }
+    end
   end
 
   # describe 'singular resource', :focused => true do
