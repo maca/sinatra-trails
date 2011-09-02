@@ -11,11 +11,11 @@ module Sinatra
     class Route
       attr_reader :name
 
-      def initialize route, name, *namespaces
-        @namespaces = namespaces.map { |name| String === name ? name.sub(/\//, '') : name }.compact
-        @components = Array === route ? route.compact : route.to_s.scan(/[^\/]+/)
-        @components = @namespaces + @components
-        @name       = @namespaces.select { |n| Symbol === n }.push(*name).compact.join('_').to_sym
+      def initialize route, name, ancestors
+        @components  = Array === route ? route.compact : route.to_s.scan(/[^\/]+/)
+        @name        = ancestors.map { |ancestor| ancestor.name }.push(*name).compact.join('_').to_sym
+        @components.unshift *ancestors.map { |ancestor| ancestor.path }.compact
+        @components.flatten!
       end
 
       def to_route
@@ -39,46 +39,52 @@ module Sinatra
     end
 
     class Scope
-      attr_reader :namespaces, :ancestors
+      attr_reader :name, :path, :ancestors
 
-      def initialize namespaces, ancestors = []
-        @namespaces, @ancestors, @routes = namespaces.compact, ancestors, []
+      def initialize path, ancestors = []
+        @ancestors, @routes = ancestors, []
+        @path = path.to_s.sub(/^\//, '') if path
+        @name = path if Symbol === path
       end
 
       def match routes
-        @routes += routes.map { |name, route| Route.new(route, name, *namespaces) }
+        @routes += routes.map { |route_name, route| Route.new(route, route_name, [*ancestors, self]) }
       end
 
-      def namespace *names, &block
-        @routes += Scope.new(namespaces + names, [*@singular_name, *ancestors]).generate_routes!(&block)
+      def namespace path, &block
+        @routes += Scope.new(path, [*ancestors, self]).generate_routes!(&block)
       end
 
-      def resources *args, &block
-        hash    = Hash === args.last ? args.pop : {}
-        shallow = hash.delete(:shallow)
-        
+      def resources *resources, &block
+        opts = {}
+        hash = Hash === resources.last ? resources.pop : {}
+        hash.delete_if { |key, val| opts[key] = val if !(Symbol === val || Hash === val)}
+        shallow = opts[:shallow]
+
         mash = Proc.new do |hash, acc|
-          hash.map do |key, val|
-            Enumerable === val ? [*acc, key, *mash.call(val, key).flatten] : [key, val]
-          end
+          hash.map { |key, val| Enumerable === val ? [*acc, key, *mash.call(val, key).flatten] : [key, val] } 
         end
 
-        resources = args.map { |e| [e] }
-        mash.call(hash).each do |element|
-          resources.push(*element.map { |e| element[0..element.index(e)] })
+        make_resource = lambda do |name|
+          Resources.new(name, [*ancestors, self], shallow.nil? ? @shallow : shallow)
         end
 
-        resources.each do |ancestors|
-          name      = ancestors.pop
-          ancestors = [*@ancestors, *@singular_name, *ancestors]
-          puts ancestors.inspect
-          # puts self.class
-          @routes  += Resources.new(name, shallow, ancestors, namespaces).generate_routes!(&block).tap { |rs| puts rs.inspect }
+        hash = mash.call(hash).map do |array|
+          array.reverse.inject(Proc.new{}) do |proc, name|
+            Proc.new{ resources(name, opts, &proc) }
+          end.call
+        end
+
+        if resources.size == 1 && hash.empty?
+          @routes += make_resource.call(resources.first).generate_routes!(&block)
+        else
+          resources.each { |name| @routes += make_resource.call(name).generate_routes! }
+          instance_eval(&block) if block_given?
         end
       end
 
       def generate_routes! &block
-        instance_eval &block
+        instance_eval &block if block_given?
         @routes
       end
 
@@ -88,41 +94,43 @@ module Sinatra
       end
     end
 
-    class Resources < Scope
-      attr_reader :plural_name, :singular_name, :name_prefix, :route_scope
+    class Action
+      attr_reader :path, :name
+      def initialize name, path = nil
+        @path, @name = path, name
+      end
+    end
 
-      def initialize name, shallow, ancestors, namespaces
-        super namespaces.map{ |n| n.to_s }, ancestors
-        @plural_name   = name.to_s
-        @shallow       = shallow
-        @singular_name = @plural_name.singularize
-        @ancestors     = @ancestors[-1..-1] || [] if @shallow
-        @name_prefix   = namespaces + @ancestors.map{ |a| a.to_s.singularize }
-        @route_scope   = @namespaces + @ancestors.map{ |a| [a.to_s.pluralize, ":#{a.to_s.singularize}_id"] }.flatten.push(plural_name)
+    class Resources < Scope
+      attr_reader :plural_name, :name_prefix, :route_scope
+
+      def initialize name, ancestors, shallow
+        super name, ancestors
+        @shallow     = shallow
+        @plural_name = @path
+        @name        = @path.singularize
+      end
+
+      def path
+        [plural_name, ":#{name}_id"]
       end
 
       def collection action = nil
-        name = [action, *name_prefix]
-        name.push action == :new ? singular_name : plural_name 
-        @routes << Route.new(action, name, *route_scope)
+        ancestors = [Action.new(action), *self.ancestors]
+        ancestors[0, ancestors.size - 1] = ancestors[0..-2].reject{ |ancestor| self.class === ancestor } if @shallow
+        @routes << Route.new([plural_name, action], [action == :new ? name : plural_name], ancestors)
       end
 
       def member action = nil
-        if @shallow
-          name      = [action, singular_name]
-          namespace = plural_name
-        else
-          name      = [action, *name_prefix, singular_name]
-          namespace = route_scope
-        end 
-        @routes << Route.new([':id', action], name, *namespace)
+        ancestors = [Action.new(action), *self.ancestors]
+        ancestors.reject!{ |ancestor| self.class === ancestor } if @shallow
+        @routes << Route.new([plural_name, ':id', action], [name], ancestors)
       end
 
       def generate_routes! &block
         collection and collection(:new)
         member and member(:edit)
-        instance_eval &block if block_given?
-        @routes
+        super
       end
     end
 
@@ -130,7 +138,7 @@ module Sinatra
     end
     
     def namespace name, &block
-      @named_routes.merge! Scope.new([name]).routes_hash(&block)
+      @named_routes.merge! Scope.new(name).routes_hash(&block)
     end
 
     def match routes
@@ -147,6 +155,14 @@ module Sinatra
 
     def path_for name, *args
       @named_routes[name].to_path(*args)
+    end
+
+    def trails
+      trails       = @named_routes.map { |name, route| [name, route.to_route]}
+      name_padding = trails.sort_by{ |e| e.first.size }.last.first.size + 3
+      trails.each do |name, route|
+        puts sprintf("%#{name_padding}s => %s", name, route) 
+      end
     end
 
     class << self
