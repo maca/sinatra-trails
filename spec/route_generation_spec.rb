@@ -1,14 +1,14 @@
 require 'spec_helper'
 
 describe 'trails' do
-  def app
+  def new_app
     app = Class.new(Sinatra::Base)
     app.register Sinatra::Trails
     app.set :environment, :test
   end
 
   before do
-    @app = app
+    @app = new_app
   end
 
   describe 'match' do
@@ -164,7 +164,6 @@ describe 'trails' do
 
     describe 'basic' do
       before do
-        @app = app
         @app.resources :users, :posts do
           match :flag => '/flag'
         end
@@ -176,7 +175,6 @@ describe 'trails' do
 
     describe 'nested with block' do
       before do
-        @app = app
         @app.resources :users do
           resources :posts
         end
@@ -187,7 +185,6 @@ describe 'trails' do
 
     describe 'with namespace' do
       before do
-        @app = app
         @app.namespace :admin do
           resources :users
         end
@@ -200,7 +197,6 @@ describe 'trails' do
 
     describe 'nested with block and namespace' do
       before do
-        @app = app
         @app.resources :users do
           namespace :admin do
             resources :posts
@@ -216,7 +212,6 @@ describe 'trails' do
 
     describe 'deep nested' do
       before do
-        @app = app
         @app.resources :users do
           resources :posts do
             resources :comments
@@ -235,7 +230,6 @@ describe 'trails' do
 
     describe 'shallow deep nested' do
       before do
-        @app = app
         @app.resources :users, :shallow => true do
           resources :posts do
             resources :comments
@@ -249,7 +243,6 @@ describe 'trails' do
 
     describe 'nested shallow' do
       before do
-        @app = app
         @app.resources :users, :shallow => true do
           resources :posts
         end
@@ -260,7 +253,6 @@ describe 'trails' do
 
     describe 'hash nested' do
       before do
-        @app = app
         @app.resources :users => :posts
       end
       it_should_behave_like 'generates routes for users'
@@ -269,7 +261,6 @@ describe 'trails' do
 
     describe 'hash nested with block' do
       before do
-        @app = app
         @app.resources :users => :posts do
           match :flag => 'flag'
         end
@@ -281,7 +272,6 @@ describe 'trails' do
 
     describe 'nested shallow with hash' do
       before do
-        @app = app
         @app.resources :users => :posts, :shallow => true
       end
       it_should_behave_like 'generates routes for users'
@@ -290,7 +280,6 @@ describe 'trails' do
 
     describe 'deep nested with hash' do
       before do
-        @app = app
         @app.resources :users => {:posts => :comments}
       end
       it_should_behave_like 'generates routes for users'
@@ -305,7 +294,6 @@ describe 'trails' do
     
     describe 'deep nested shallow with hash' do
       before do
-        @app = app
         @app.resources :users => {:posts => :comments}, :shallow => true
       end
       it_should_behave_like 'generates routes for users'
@@ -314,6 +302,20 @@ describe 'trails' do
       it { @app.route_for(:new_post_comment).should  == '/posts/:post_id/comments/new' }
       it { @app.route_for(:comment).should           == '/comments/:id' }
       it { @app.route_for(:edit_comment).should      == '/comments/:id/edit' }
+    end
+  end
+
+  describe 'sinatra integration' do
+    include Rack::Test::Methods
+
+    def app
+      @app ||= new_app
+    end
+
+    it "should delegate to sinatra" do
+      app.match(:root => '/') { get('/'){ 'root'} }
+      get '/'
+      last_response.body.should == 'root'
     end
   end
 end

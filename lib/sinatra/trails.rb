@@ -41,18 +41,20 @@ module Sinatra
     class Scope
       attr_reader :name, :path, :ancestors
 
-      def initialize path, ancestors = []
+      def initialize app, path, ancestors = []
         @ancestors, @routes = ancestors, []
         @path = path.to_s.sub(/^\//, '') if path
         @name = path if Symbol === path
+        @sinatra_app = app
       end
 
-      def match routes
+      def match routes, &block
         @routes += routes.map { |route_name, route| Route.new(route, route_name, [*ancestors, self]) }
+        instance_eval &block if block_given?
       end
 
       def namespace path, &block
-        @routes += Scope.new(path, [*ancestors, self]).generate_routes!(&block)
+        @routes += Scope.new(@sinatra_app, path, [*ancestors, self]).generate_routes!(&block)
       end
 
       def resources *resources, &block
@@ -66,7 +68,7 @@ module Sinatra
         end
 
         make_resource = lambda do |name|
-          Resources.new(name, [*ancestors, self], shallow.nil? ? @shallow : shallow)
+          Resources.new(@sinatra_app, name, [*ancestors, self], shallow.nil? ? @shallow : shallow)
         end
 
         hash = mash.call(hash).map do |array|
@@ -92,6 +94,10 @@ module Sinatra
         generate_routes! &block
         Hash[*@routes.map{ |route| [route.name, route]}.flatten]
       end
+
+      def method_missing name, *args, &block
+        @sinatra_app.send name, *args, &block
+      end
     end
 
     class Action
@@ -104,8 +110,8 @@ module Sinatra
     class Resources < Scope
       attr_reader :plural_name, :name_prefix, :route_scope
 
-      def initialize name, ancestors, shallow
-        super name, ancestors
+      def initialize app, name, ancestors, shallow
+        super app, name, ancestors
         @shallow     = shallow
         @plural_name = @path
         @name        = @path.singularize
@@ -138,11 +144,11 @@ module Sinatra
     end
     
     def namespace name, &block
-      @named_routes.merge! Scope.new(name).routes_hash(&block)
+      @named_routes.merge! Scope.new(self, name).routes_hash(&block)
     end
 
-    def match routes
-      namespace(nil) { match routes }
+    def match routes, &block
+      namespace(nil) { match routes, &block }
     end
 
     def resources *args, &block
