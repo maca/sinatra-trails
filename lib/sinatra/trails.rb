@@ -2,18 +2,23 @@ require "sinatra/base"
 require "active_support/inflector"
 require "active_support/inflections"
 require "active_support/core_ext/string/inflections"
+require 'ostruct'
 
-$:.unshift File.dirname( __FILE__) 
+libdir = File.dirname( __FILE__)
+$:.unshift(libdir) unless $:.include?(libdir)
 require "trails/version"
 
 module Sinatra
   module Trails
-    class Route
-      attr_reader :name
+    class RouteNotDefined < Exception; end
 
-      def initialize route, name, ancestors
+    class Route
+      attr_reader :name, :scope
+
+      def initialize route, name, ancestors, scope
         @components  = Array === route ? route.compact : route.to_s.scan(/[^\/]+/)
         @name        = ancestors.map { |ancestor| ancestor.name }.push(*name).compact.join('_').to_sym
+        @scope       = scope
         @components.unshift *ancestors.map { |ancestor| ancestor.path }.compact
         @components.flatten!
       end
@@ -48,41 +53,23 @@ module Sinatra
         @sinatra_app = app
       end
 
-      def match routes, &block
-        @routes += routes.map { |route_name, route| Route.new(route, route_name, [*ancestors, self]) }
+      def match name, opts = {}, &block
+        path = opts.delete(:to) || name
+        @routes << route = Route.new(path, name, [*ancestors, self], self)
         instance_eval &block if block_given?
+        route
       end
 
       def namespace path, &block
         @routes += Scope.new(@sinatra_app, path, [*ancestors, self]).generate_routes!(&block)
       end
 
-      def resources *resources, &block
-        opts = {}
-        hash = Hash === resources.last ? resources.pop : {}
-        hash.delete_if { |key, val| opts[key] = val if !(Symbol === val || Hash === val)}
-        shallow = opts[:shallow]
+      def resource *names, &block
+        restful_routes Resource, names, &block
+      end
 
-        mash = Proc.new do |hash, acc|
-          hash.map { |key, val| Enumerable === val ? [*acc, key, *mash.call(val, key).flatten] : [key, val] } 
-        end
-
-        make_resource = lambda do |name|
-          Resources.new(@sinatra_app, name, [*ancestors, self], shallow.nil? ? @shallow : shallow)
-        end
-
-        hash = mash.call(hash).map do |array|
-          array.reverse.inject(Proc.new{}) do |proc, name|
-            Proc.new{ resources(name, opts, &proc) }
-          end.call
-        end
-
-        if resources.size == 1 && hash.empty?
-          @routes += make_resource.call(resources.first).generate_routes!(&block)
-        else
-          resources.each { |name| @routes += make_resource.call(name).generate_routes! }
-          instance_eval(&block) if block_given?
-        end
+      def resources *names, &block
+        restful_routes Resources, names, &block
       end
 
       def generate_routes! &block
@@ -91,28 +78,71 @@ module Sinatra
       end
 
       def routes_hash &block
-        generate_routes! &block
-        Hash[*@routes.map{ |route| [route.name, route]}.flatten]
+        Hash[*generate_routes!(&block).map{ |route| [route.name, route]}.flatten]
       end
 
+      private
       def method_missing name, *args, &block
-        @sinatra_app.send name, *args, &block
+        if route = @routes.find{ |route| route.name == name }
+          return route.to_route unless block_given?
+          @routes = @routes | route.scope.generate_routes!(&block)
+        else
+          @sinatra_app.send name, *args, &block 
+        end
+      end
+
+      def restful_routes builder, names, &block
+        opts = {}
+        hash = Hash === names.last ? names.pop : {}
+        hash.delete_if { |key, val| opts[key] = val if !(Symbol === val || Hash === val) }
+
+        mash = Proc.new do |hash, acc|
+          hash.map { |key, val| Enumerable === val ? [*acc, key, *mash.call(val, key).flatten] : [key, val] } 
+        end
+
+        hash = mash.call(hash).map do |array|
+          array.reverse.inject(Proc.new{}) do |proc, name|
+            Proc.new{ send(builder == Resource ? :resource : :resources, name, opts, &proc) }
+          end.call
+        end
+
+        make = lambda do |name|
+          builder.new(@sinatra_app, name, [*ancestors, self], (@opts || {}).merge(opts))
+        end
+
+        if names.size == 1 && hash.empty?
+          @routes += make.call(names.first).generate_routes!(&block)
+        else
+          names.each { |name| @routes += make.call(name).generate_routes! }
+          instance_eval &block if block_given?
+        end
       end
     end
 
-    class Action
-      attr_reader :path, :name
-      def initialize name, path = nil
-        @path, @name = path, name
+    class Resource < Scope
+      def initialize app, name, ancestors, opts
+        super app, name, ancestors
+        @opts = opts
+      end
+
+      def member action = nil
+        ancestors = [OpenStruct.new(:name => action, :path => nil), *self.ancestors]
+        @routes << route = Route.new([name, action], name, ancestors, self)
+        route.to_route
+      end
+
+      def generate_routes! &block
+        member and member(:new) and member(:edit)
+        super
       end
     end
 
     class Resources < Scope
-      attr_reader :plural_name, :name_prefix, :route_scope
+      attr_reader :plural_name, :name_prefix, :route_scope, :opts
 
-      def initialize app, name, ancestors, shallow
+      def initialize app, name, ancestors, opts
         super app, name, ancestors
-        @shallow     = shallow
+        @opts        = opts
         @plural_name = @path
         @name        = @path.singularize
       end
@@ -122,15 +152,17 @@ module Sinatra
       end
 
       def collection action = nil
-        ancestors = [Action.new(action), *self.ancestors]
-        ancestors[0, ancestors.size - 1] = ancestors[0..-2].reject{ |ancestor| self.class === ancestor } if @shallow
-        @routes << Route.new([plural_name, action], [action == :new ? name : plural_name], ancestors)
+        ancestors = [OpenStruct.new(:name => action, :path => nil), *self.ancestors]
+        ancestors[0, ancestors.size - 1] = ancestors[0..-2].reject{ |ancestor| self.class === ancestor } if opts[:shallow]
+        @routes << route = Route.new([plural_name, action], [action == :new ? name : plural_name], ancestors, self)
+        route.to_route
       end
 
       def member action = nil
-        ancestors = [Action.new(action), *self.ancestors]
-        ancestors.reject!{ |ancestor| self.class === ancestor } if @shallow
-        @routes << Route.new([plural_name, ':id', action], [name], ancestors)
+        ancestors = [OpenStruct.new(:name => action, :path => nil), *self.ancestors]
+        ancestors.reject!{ |ancestor| self.class === ancestor } if opts[:shallow]
+        @routes << route = Route.new([plural_name, ':id', action], name, ancestors, self)
+        route.to_route
       end
 
       def generate_routes! &block
@@ -140,15 +172,17 @@ module Sinatra
       end
     end
 
-    class RouteNotDefined < Exception
-    end
-    
     def namespace name, &block
       @named_routes.merge! Scope.new(self, name).routes_hash(&block)
     end
 
-    def match routes, &block
-      namespace(nil) { match routes, &block }
+    def match name, opts = {}, &block
+      namespace(nil) { match name, opts, &block }
+      route_for name
+    end
+
+    def resource *args, &block
+      namespace(nil) { resource *args, &block }
     end
 
     def resources *args, &block
@@ -189,6 +223,13 @@ module Sinatra
     end
 
     module Helpers
+      def path_for *args
+        self.class.path_for *args
+      end
+
+      def url_for *args
+        url path_for(*args)
+      end
     end
   end
 

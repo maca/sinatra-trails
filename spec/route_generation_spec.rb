@@ -1,6 +1,8 @@
 require 'spec_helper'
 
 describe 'trails' do
+  include Rack::Test::Methods
+
   def new_app
     app = Class.new(Sinatra::Base)
     app.register Sinatra::Trails
@@ -14,21 +16,21 @@ describe 'trails' do
   describe 'match' do
     describe 'basic' do
       before do
-        @app.match :root => '/'
-        @app.match :dashboard => '/dashboard'
-        @app.match :edit_user => '/users/:id/edit'
+        @app.match :home, :to => '/'
+        @app.match :dashboard
+        @app.match :edit_user, :to => '/users/:id/edit'
       end
 
       describe 'routes' do
-        it { @app.route_for(:root).should       == '/' }
+        it { @app.route_for(:home).should       == '/' }
         it { @app.route_for(:dashboard).should  == '/dashboard' }
         it { @app.route_for('dashboard').should == '/dashboard' }
         it { lambda{ @app.route_for(:missing) }.should raise_error Sinatra::Trails::RouteNotDefined }
       end
 
       describe 'paths' do
-        it { @app.path_for(:root).should       == '/' }
-        it { @app.path_for(:root, :q => 'q', :a => 'a').should == '/?q=q&a=a' }
+        it { @app.path_for(:home).should       == '/' }
+        it { @app.path_for(:home, :q => 'q', :a => 'a').should == '/?q=q&a=a' }
 
         describe 'with placeholders' do
           before { @mock_user = mock(:user, :to_param => 1)}
@@ -48,19 +50,11 @@ describe 'trails' do
       end
     end
 
-    describe 'multiple' do
-      before do
-        @app.match :dashboard => '/dashboard', :logout => '/sign-out'
-      end
-      it { @app.route_for(:dashboard).should == '/dashboard' }
-      it { @app.route_for(:logout).should    == '/sign-out' }
-    end
-
     describe 'with namespace' do
       before do
         @app.namespace '/admin' do
-          match :dashboard => '/dashboard'
-          match :logout => '/logout'
+          match :dashboard
+          match :logout
         end
       end
       it { @app.route_for(:dashboard).should == '/admin/dashboard' }
@@ -70,7 +64,7 @@ describe 'trails' do
     describe 'with named namespace' do
       before do
         @app.namespace :admin do
-          match :dashboard => '/dashboard'
+          match :dashboard
         end
       end
       it { @app.route_for(:admin_dashboard).should == '/admin/dashboard' }
@@ -79,12 +73,12 @@ describe 'trails' do
     describe 'with nested namespace' do
       before do
         @app.namespace '/blog' do
-          match :users => '/users'
+          match :users
           namespace '/admin' do
-            match :dashboard => '/dashboard'
+            match :dashboard
             namespace '/auth' do
-              match :logout => '/logout'
-              match :login  => '/login'
+              match :logout
+              match :login
             end
           end
         end
@@ -98,12 +92,12 @@ describe 'trails' do
     describe 'with named nested namespace' do
       before do
         @app.namespace :blog do
-          match :users => '/users'
+          match :users
           namespace :admin do
-            match :dashboard => '/dashboard'
+            match :dashboard
             namespace :auth do
-              match :logout => '/logout'
-              match :login  => '/login'
+              match :logout
+              match :login
             end
           end
         end
@@ -165,7 +159,7 @@ describe 'trails' do
     describe 'basic' do
       before do
         @app.resources :users, :posts do
-          match :flag => '/flag'
+          match :flag
         end
       end
       it_should_behave_like 'generates routes for users'
@@ -262,7 +256,7 @@ describe 'trails' do
     describe 'hash nested with block' do
       before do
         @app.resources :users => :posts do
-          match :flag => 'flag'
+          match :flag
         end
       end
       it_should_behave_like 'generates routes for users'
@@ -305,17 +299,48 @@ describe 'trails' do
     end
   end
 
-  describe 'sinatra integration' do
-    include Rack::Test::Methods
-
-    def app
-      @app ||= new_app
+  describe 'resource' do
+    before do
+      @app.resource :user => :profile
     end
+    it { @app.route_for(:user).should               == '/user' }
+    it { @app.route_for(:new_user).should           == '/user/new' }
+    it { @app.route_for(:edit_user).should          == '/user/edit' }
+    it { @app.route_for(:user_profile).should       == '/user/profile' }
+    it { @app.route_for(:new_user_profile).should   == '/user/profile/new' }
+    it { @app.route_for(:edit_user_profile).should  == '/user/profile/edit' }
+  end
 
-    it "should delegate to sinatra" do
-      app.match(:root => '/') { get('/'){ 'root'} }
-      get '/'
-      last_response.body.should == 'root'
+  describe 'sinatra integration' do
+    def app; @app ||= new_app end
+
+    it "should delegate to sinatra and have access to named routes" do
+      app.match(:home) { get(home){ path_for(:home) } }
+      app.instance_eval { get(match(:about)){ url_for(:about) } }
+      get '/home'
+      last_response.body.should == '/home'
+      get '/about'
+      last_response.body.should == 'http://example.org/about'
     end
   end
+
+  describe 'creating resource member within block' do
+    def app; @app ||= new_app end
+
+    it 'should make path for resource member' do
+      app.resources(:users => :posts, :shallow => true) do
+        users do
+          get(member(:aprove)) { path_for(:aprove_user, 1) }
+        end
+
+        user_posts do
+          get(member(:aprove)) { path_for(:aprove_post, 1) }
+        end
+      end
+      get '/users/1/aprove'
+      last_response.body.should == '/users/1/aprove'
+      get '/posts/1/aprove'
+      last_response.body.should == '/posts/1/aprove'
+    end
+  end 
 end

@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
   s.version     = Sinatra::Trails::VERSION
   s.authors     = ["Macario"]
   s.email       = ["macarui@gmail.com"]
-  s.homepage    = ""
+  s.homepage    = "http://github.com/maca/sinatra-trails"
   s.summary     = %q{TODO: Write a gem summary}
   s.description = %q{TODO: Write a gem description}
 
