@@ -94,13 +94,23 @@ module Sinatra
       def restful_routes builder, names, &block
         opts = {}
         hash = Hash === names.last ? names.pop : {}
-        hash.delete_if { |key, val| opts[key] = val if !(Symbol === val || Hash === val) }
+        hash.delete_if { |key, val| opts[key] = val if !(Symbol === val || Hash === val || Array === val) }
 
+        nested = []
         mash = Proc.new do |hash, acc|
-          hash.map { |key, val| Enumerable === val ? [*acc, key, *mash.call(val, key).flatten] : [key, val] } 
+          hash.map do |key, val| 
+            case val
+            when Hash
+              [*acc, key, *mash.call(val, key).flatten]
+            when Array
+              nested += val.map{ |r| [*acc, key, r] } and next
+            else
+              [key, val]
+            end
+          end 
         end
 
-        hash = mash.call(hash).map do |array|
+        hash = (mash.call(hash) + nested).compact.map do |array|
           array.reverse.inject(Proc.new{}) do |proc, name|
             Proc.new{ send(builder == Resource ? :resource : :resources, name, opts, &proc) }
           end.call

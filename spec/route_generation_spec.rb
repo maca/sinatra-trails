@@ -297,6 +297,15 @@ describe 'trails' do
       it { @app.route_for(:comment).should           == '/comments/:id' }
       it { @app.route_for(:edit_comment).should      == '/comments/:id/edit' }
     end
+
+    describe 'nested with array' do
+      before do
+        @app.resources :users => [:posts, :comments]
+      end
+      it { @app.route_for(:users).should           == '/users' }
+      it { @app.route_for(:user_comments).should   == '/users/:user_id/comments' }
+      it { @app.route_for(:user_posts).should      == '/users/:user_id/posts' }
+    end
   end
 
   describe 'resource' do
@@ -330,17 +339,29 @@ describe 'trails' do
     it 'should make path for resource member' do
       app.resources(:users => :posts, :shallow => true) do
         users do
-          get(member(:aprove)) { path_for(:aprove_user, 1) }
+          get(member(:aprove)) { path_for(:aprove_user, params[:id]) }
         end
 
         user_posts do
-          get(member(:aprove)) { path_for(:aprove_post, 1) }
+          get(member(:aprove)) { path_for(:aprove_post, params[:id]) }
         end
       end
       get '/users/1/aprove'
       last_response.body.should == '/users/1/aprove'
       get '/posts/1/aprove'
       last_response.body.should == '/posts/1/aprove'
+    end
+  end 
+
+  describe 'creating resource member within block' do
+    def app; @app ||= new_app end
+
+    it 'should make path for resource member' do
+      app.resources(:users) do
+        get(users) { params[:resource_name] }
+      end
+      get '/users'
+      last_response.body.should == 'user'
     end
   end 
 end
