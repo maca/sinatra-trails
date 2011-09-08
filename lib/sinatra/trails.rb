@@ -20,8 +20,8 @@ module Sinatra
         # the array contains nils as placeholders, everithing precompiled
         @components  = Array === route ? route.compact : route.to_s.scan(/[^\/]+/)
         @full_name   = ancestors.map { |ancestor| ancestor.name }.push(*name).compact
-        @name        = @full_name.last
-        @full_name   = @full_name.join('_').to_sym
+        @name        = @full_name.last.to_s
+        @full_name   = @full_name.join('_')
         @components.unshift *ancestors.map { |ancestor| ancestor.path }.compact
         @scope       = scope
         @to_route    = "/#{@components.join('/')}"
@@ -105,7 +105,8 @@ module Sinatra
       end
 
       def find_route name
-        @routes.find{ |route| route.full_name == name || route.scope == self && route.name.to_sym == name }
+        name = name.to_s
+        @routes.find{ |route| route.full_name == name || route.scope == self && route.name == name }
       end
 
       private
@@ -245,8 +246,8 @@ module Sinatra
     class << self
       def routes_hash
         Hash.new do |hash, key| 
-          if String === key
-            hash[key.to_sym]
+          if Symbol === key
+            hash[key.to_s]
           else
             raise RouteNotDefined.new("The route `#{key}` is not defined") 
           end
