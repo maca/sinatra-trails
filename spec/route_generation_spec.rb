@@ -322,13 +322,36 @@ describe 'trails' do
       @scope.generate_routes!{ map(:index) }
     end
 
-    it { @scope.find_route(:admin_index).should_not be_nil }
-    it { @scope.find_route(:index).should_not be_nil }
+    it { @scope.route_for(:admin_index).should_not be_nil }
+    it { @scope.route_for(:index).should_not be_nil }
     it "should find resources index without full name"
   end
 
-  describe 'sinatra integration' do
+  describe 'finding route for resources' do
+    before do
+      @scope = Sinatra::Trails::Resources.new(app, :users, [], {})
+      @scope.generate_routes!
+    end
+    it { @scope.route_for(:users).should_not be_nil }
+    it { @scope.route_for(:new_user).should_not be_nil }
+    it { @scope.route_for(:edit_user).should_not be_nil }
+    it { @scope.route_for(:user).should_not be_nil }
+  end
 
+  describe 'finding route for resources' do
+    before do
+      @scope = Sinatra::Trails::Resources.new(app, :users, [], {})
+      @scope.generate_routes! do
+        resources :posts
+      end
+    end
+    it { @scope.route_for(:user_posts).should_not be_nil }
+    it { @scope.route_for(:new_user_post).should_not be_nil }
+    it { @scope.route_for(:edit_user_post).should_not be_nil }
+    it { @scope.route_for(:user_post).should_not be_nil }
+  end
+
+  describe 'sinatra integration' do
     describe 'delegation to sinatra and helpers' do
       before do
         app.map(:home) { get(home){ path_for(:home) } }
@@ -432,16 +455,58 @@ describe 'trails' do
         last_response.body.should == ''
       end
     end
-  end
 
-  # describe 'creating resource member within block' do
-  #   def app; app ||= new_app end
-  #   it 'should make path for resource member' do
-  #     app.resources(:users) do
-  #       get(users) { @resource.to_s }
-  #     end
-  #     get '/users'
-  #     last_response.body.should == 'user'
-  #   end
-  # end 
+    describe 'before filter lazy match passing symbols' do
+      before do
+        app.instance_eval do
+          namespace(:admin) do 
+            before(:admin_sign_in, :admin_sign_up) { @auth = true }
+
+            get map(:index, :to => '/') do
+              @auth.to_s
+            end
+
+            get map(:sign_in, :to => '/sign_in') do
+              @auth.to_s
+            end
+
+            get map(:sign_up, :to => '/sign_up') do
+              @auth.to_s
+            end
+          end
+        end
+      end
+
+      it 'should set before filter for passed routes' do
+        get '/admin/sign_in'
+        last_response.body.should == 'true'
+        get '/admin/sign_up'
+        last_response.body.should == 'true'
+      end
+
+      it 'should not set before filter for not passed routes' do
+        get '/admin'
+        last_response.body.should == ''
+      end
+    end
+
+    describe 'having access to resource name' do
+      before do
+        app.resources(:users => :posts) do
+          get(users){ params[:resource_name].to_s }
+          get(user_posts){ params[:resource_name].to_s }
+        end
+      end
+
+      it 'should access resource name for users' do
+        get '/users'
+        last_response.body.should == 'user'
+      end
+
+      it 'should access resource name for nested posts' do
+        get '/users/1/posts'
+        last_response.body.should == 'post'
+      end
+    end
+  end
 end

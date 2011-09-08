@@ -14,6 +14,7 @@ module Sinatra
 
     class Route
       attr_reader :name, :full_name, :scope, :keys, :to_route, :to_regexp
+      Match = Struct.new(:captures)
 
       def initialize route, name, ancestors, scope
         @name        = name.to_s
@@ -21,12 +22,26 @@ module Sinatra
         @components  = Array === route ? route.compact : route.to_s.scan(/[^\/]+/)
         @components.unshift *ancestors.map { |ancestor| ancestor.path }.compact
         @scope       = scope
-        @to_route    = "/#{@components.join('/')}"
+        @captures    = []
+        compile!
+      end
+
+      def compile!
+        @to_route = "/#{@components.join('/')}"
         @to_regexp, @keys = Sinatra::Base.send(:compile, to_route)
+        case scope
+        when Resource, Resources
+          unless keys.include?('resource_name')
+            @keys << 'resource_name'
+            @captures << scope.name
+          end
+        end
       end
 
       def match str
-        to_regexp.match str
+        if match_data = to_regexp.match(str)
+          Match.new(match_data.captures + @captures)
+        end
       end
 
       def to_path *args
@@ -45,8 +60,31 @@ module Sinatra
       end
     end
 
+    class ScopeMatcher
+      def initialize scope, paths
+        @scope, @paths = scope, paths
+      end
+      
+      def match str
+        if @paths.empty?
+          matchers = @scope.routes
+        else
+          matchers = @paths.map do |element| 
+            case element
+            when Route then element
+            when Symbol then @scope[element]
+            else
+              Sinatra::Base.send(:compile, element).first
+            end
+          end
+        end
+        Regexp.union(matchers).match str
+      end
+    end
+
     class Scope
-      attr_reader :name, :path, :ancestors
+      attr_reader :name, :path, :ancestors, :routes
+      Action = Struct.new(:name, :path)
 
       def initialize app, path, ancestors = []
         @ancestors, @routes = ancestors, []
@@ -76,12 +114,7 @@ module Sinatra
 
       def before *args, &block
         opts = Hash === args.last ? args.pop : {}
-        if args.empty?
-          path = self
-        else
-          path = Regexp.union *args.map{ |element| Sinatra::Base.send(:compile, element).first }
-        end
-        @sinatra_app.before path, opts, &block
+        @sinatra_app.before ScopeMatcher.new(self, args), opts, &block
       end
 
       def generate_routes! &block
@@ -89,26 +122,24 @@ module Sinatra
         @routes
       end
 
-      def match str
-        Regexp.union(*@routes).match str
-      end
-
       def routes_hash &block
         Hash[*generate_routes!(&block).map{ |route| [route.full_name, route]}.flatten]
       end
 
-      def find_route name
+      def route_for name
         name = name.to_s
         @routes.find{ |route| route.full_name == name || route.scope == self && route.name == name }
       end
+      alias :[] :route_for
 
       private
       def method_missing name, *args, &block
-        if route = find_route(name)
+        return @sinatra_app.send(name, *args, &block) if @sinatra_app.respond_to?(name)
+        if route = route_for(name)
           return route unless block_given?
           @routes = @routes | route.scope.generate_routes!(&block)
         else
-          @sinatra_app.send(name, *args, &block)
+          super
         end
       end
 
@@ -157,7 +188,7 @@ module Sinatra
       end
 
       def member action = nil
-        ancestors = [OpenStruct.new(:name => action, :path => nil), *self.ancestors]
+        ancestors = [Action.new(action, nil), *self.ancestors]
         @routes << route = Route.new([name, action], name, ancestors, self)
         route
       end
@@ -175,7 +206,7 @@ module Sinatra
         super app, name, ancestors
         @opts        = opts
         @plural_name = @path
-        @name        = @path.singularize
+        @name        = @plural_name.singularize
       end
 
       def path
@@ -183,14 +214,14 @@ module Sinatra
       end
 
       def collection action = nil
-        ancestors = [OpenStruct.new(:name => action, :path => nil), *self.ancestors]
+        ancestors = [Action.new(action, nil), *self.ancestors]
         ancestors[0, ancestors.size - 1] = ancestors[0..-2].reject{ |ancestor| self.class === ancestor } if opts[:shallow]
         @routes << route = Route.new([plural_name, action], [action == :new ? name : plural_name], ancestors, self)
         route
       end
 
       def member action = nil
-        ancestors = [OpenStruct.new(:name => action, :path => nil), *self.ancestors]
+        ancestors = [Action.new(action, nil), *self.ancestors]
         ancestors.reject!{ |ancestor| self.class === ancestor } if opts[:shallow]
         @routes << route = Route.new([plural_name, ':id', action], name, ancestors, self)
         route
