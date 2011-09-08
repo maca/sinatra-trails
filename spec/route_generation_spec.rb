@@ -3,47 +3,43 @@ require 'spec_helper'
 describe 'trails' do
   include Rack::Test::Methods
 
-  def new_app
+  let(:app) do
     app = Class.new(Sinatra::Base)
     app.register Sinatra::Trails
     app.set :environment, :test
   end
 
-  before do
-    @app = new_app
-  end
-
   describe 'map' do
     describe 'basic' do
       before do
-        @app.map :home, :to => '/'
-        @app.map :dashboard
-        @app.map :edit_user, :to => '/users/:id/edit'
+        app.map :home, :to => '/'
+        app.map :dashboard
+        app.map :edit_user, :to => '/users/:id/edit'
       end
 
       describe 'routes' do
-        it { @app.route_for(:home).should       == '/' }
-        it { @app.route_for(:dashboard).should  == '/dashboard' }
-        it { @app.route_for('dashboard').should == '/dashboard' }
-        it { lambda{ @app.route_for(:missing) }.should raise_error Sinatra::Trails::RouteNotDefined }
+        it { app.route_for(:home).should       == '/' }
+        it { app.route_for(:dashboard).should  == '/dashboard' }
+        it { app.route_for('dashboard').should == '/dashboard' }
+        it { lambda{ app.route_for(:missing) }.should raise_error Sinatra::Trails::RouteNotDefined }
       end
 
       describe 'paths' do
-        it { @app.path_for(:home).should       == '/' }
-        it { @app.path_for(:home, :q => 'q', :a => 'a').should == '/?q=q&a=a' }
+        it { app.path_for(:home).should       == '/' }
+        it { app.path_for(:home, :q => 'q', :a => 'a').should == '/?q=q&a=a' }
 
         describe 'with placeholders' do
           before { @mock_user = mock(:user, :to_param => 1)}
-          it { @app.path_for(:edit_user, 1).should     == '/users/1/edit' }
-          it { @app.path_for(:edit_user, @mock_user).should  == '/users/1/edit' }
+          it { app.path_for(:edit_user, 1).should     == '/users/1/edit' }
+          it { app.path_for(:edit_user, @mock_user).should  == '/users/1/edit' }
 
           describe 'wrong arg count' do
             it 'should raise error when not passing :id' do
-              lambda { @app.path_for(:edit_user) }.should raise_error(ArgumentError)
+              lambda { app.path_for(:edit_user) }.should raise_error(ArgumentError)
             end
 
             it 'should raise error when too many params are passed' do
-              lambda { @app.path_for(:edit_user, 1, 2) }.should raise_error(ArgumentError)
+              lambda { app.path_for(:edit_user, 1, 2) }.should raise_error(ArgumentError)
             end
           end
         end
@@ -52,27 +48,27 @@ describe 'trails' do
 
     describe 'with namespace' do
       before do
-        @app.namespace '/admin' do
+        app.namespace '/admin' do
           map :dashboard
           map :logout
         end
       end
-      it { @app.route_for(:dashboard).should == '/admin/dashboard' }
-      it { @app.route_for(:logout).should    == '/admin/logout' }
+      it { app.route_for(:dashboard).should == '/admin/dashboard' }
+      it { app.route_for(:logout).should    == '/admin/logout' }
     end
 
     describe 'with named namespace' do
       before do
-        @app.namespace :admin do
+        app.namespace :admin do
           map :dashboard
         end
       end
-      it { @app.route_for(:admin_dashboard).should == '/admin/dashboard' }
+      it { app.route_for(:admin_dashboard).should == '/admin/dashboard' }
     end
 
     describe 'with nested namespace' do
       before do
-        @app.namespace '/blog' do
+        app.namespace '/blog' do
           map :users
           namespace '/admin' do
             map :dashboard
@@ -83,15 +79,15 @@ describe 'trails' do
           end
         end
       end
-      it { @app.route_for(:users).should     == '/blog/users' }
-      it { @app.route_for(:dashboard).should == '/blog/admin/dashboard' }
-      it { @app.route_for(:logout).should    == '/blog/admin/auth/logout' }
-      it { @app.route_for(:login).should     == '/blog/admin/auth/login' }
+      it { app.route_for(:users).should     == '/blog/users' }
+      it { app.route_for(:dashboard).should == '/blog/admin/dashboard' }
+      it { app.route_for(:logout).should    == '/blog/admin/auth/logout' }
+      it { app.route_for(:login).should     == '/blog/admin/auth/login' }
     end
 
     describe 'with named nested namespace' do
       before do
-        @app.namespace :blog do
+        app.namespace :blog do
           map :users
           namespace :admin do
             map :dashboard
@@ -102,36 +98,36 @@ describe 'trails' do
           end
         end
       end
-      it { @app.route_for(:blog_users).should             == '/blog/users' }
-      it { @app.route_for(:blog_admin_dashboard).should   == '/blog/admin/dashboard' }
-      it { @app.route_for(:blog_admin_auth_logout).should == '/blog/admin/auth/logout' }
-      it { @app.route_for(:blog_admin_auth_login).should  == '/blog/admin/auth/login' }
+      it { app.route_for(:blog_users).should             == '/blog/users' }
+      it { app.route_for(:blog_admin_dashboard).should   == '/blog/admin/dashboard' }
+      it { app.route_for(:blog_admin_auth_logout).should == '/blog/admin/auth/logout' }
+      it { app.route_for(:blog_admin_auth_login).should  == '/blog/admin/auth/login' }
     end
   end
 
   describe 'resources' do
     shared_examples_for 'generates routes for users' do
-      it { @app.route_for(:users).should      == '/users' }
-      it { @app.route_for(:new_user).should   == '/users/new' }
-      it { @app.route_for(:user).should       == '/users/:id' }
-      it { @app.route_for(:edit_user).should  == '/users/:id/edit' }
+      it { app.route_for(:users).should      == '/users' }
+      it { app.route_for(:new_user).should   == '/users/new' }
+      it { app.route_for(:user).should       == '/users/:id' }
+      it { app.route_for(:edit_user).should  == '/users/:id/edit' }
     end
 
     shared_examples_for 'generates routes for posts' do
-      it { @app.route_for(:posts).should      == '/posts' }
-      it { @app.route_for(:new_post).should   == '/posts/new' }
-      it { @app.route_for(:post).should       == '/posts/:id' }
-      it { @app.route_for(:edit_post).should  == '/posts/:id/edit' }
+      it { app.route_for(:posts).should      == '/posts' }
+      it { app.route_for(:new_post).should   == '/posts/new' }
+      it { app.route_for(:post).should       == '/posts/:id' }
+      it { app.route_for(:edit_post).should  == '/posts/:id/edit' }
     end
 
     shared_examples_for 'generates routes for nested user posts collections' do
-      it { @app.route_for(:user_posts).should     == '/users/:user_id/posts' }
-      it { @app.route_for(:new_user_post).should  == '/users/:user_id/posts/new' }
+      it { app.route_for(:user_posts).should     == '/users/:user_id/posts' }
+      it { app.route_for(:new_user_post).should  == '/users/:user_id/posts/new' }
     end
 
     shared_examples_for 'generates routes for nested user posts members' do
-      it { @app.route_for(:user_post).should      == '/users/:user_id/posts/:id' }
-      it { @app.route_for(:edit_user_post).should == '/users/:user_id/posts/:id/edit' }
+      it { app.route_for(:user_post).should      == '/users/:user_id/posts/:id' }
+      it { app.route_for(:edit_user_post).should == '/users/:user_id/posts/:id/edit' }
     end
 
     shared_examples_for 'generates routes for nested user posts' do
@@ -141,35 +137,35 @@ describe 'trails' do
 
     shared_examples_for 'generates routes for shallow user posts' do
       it_should_behave_like 'generates routes for nested user posts collections'
-      it { @app.route_for(:post).should      == '/posts/:id' }
-      it { @app.route_for(:edit_post).should == '/posts/:id/edit' }
+      it { app.route_for(:post).should      == '/posts/:id' }
+      it { app.route_for(:edit_post).should == '/posts/:id/edit' }
     end
 
     shared_examples_for 'generates routes for nested post comments collections' do
-      it { @app.route_for(:post_comments).should     == '/posts/:post_id/comments' }
-      it { @app.route_for(:new_post_comment).should  == '/posts/:post_id/comments/new' }
+      it { app.route_for(:post_comments).should     == '/posts/:post_id/comments' }
+      it { app.route_for(:new_post_comment).should  == '/posts/:post_id/comments/new' }
     end
 
     shared_examples_for 'generates routes for shallow post comments' do
       it_should_behave_like 'generates routes for nested post comments collections'
-      it { @app.route_for(:comment).should      == '/comments/:id' }
-      it { @app.route_for(:edit_comment).should == '/comments/:id/edit' }
+      it { app.route_for(:comment).should      == '/comments/:id' }
+      it { app.route_for(:edit_comment).should == '/comments/:id/edit' }
     end
 
     describe 'basic' do
       before do
-        @app.resources :users, :posts do
+        app.resources :users, :posts do
           map :flag
         end
       end
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for posts'
-      it { @app.route_for(:flag).should == '/flag' }
+      it { app.route_for(:flag).should == '/flag' }
     end
 
     describe 'nested with block' do
       before do
-        @app.resources :users do
+        app.resources :users do
           resources :posts
         end
       end
@@ -179,34 +175,34 @@ describe 'trails' do
 
     describe 'with namespace' do
       before do
-        @app.namespace :admin do
+        app.namespace :admin do
           resources :users
         end
       end
-      it { @app.route_for(:admin_users).should          == '/admin/users' }
-      it { @app.route_for(:new_admin_user).should       == '/admin/users/new' }
-      it { @app.route_for(:admin_user).should           == '/admin/users/:id' }
-      it { @app.route_for(:edit_admin_user).should      == '/admin/users/:id/edit' }
+      it { app.route_for(:admin_users).should          == '/admin/users' }
+      it { app.route_for(:new_admin_user).should       == '/admin/users/new' }
+      it { app.route_for(:admin_user).should           == '/admin/users/:id' }
+      it { app.route_for(:edit_admin_user).should      == '/admin/users/:id/edit' }
     end
 
     describe 'nested with block and namespace' do
       before do
-        @app.resources :users do
+        app.resources :users do
           namespace :admin do
             resources :posts
           end
         end
       end
       it_should_behave_like 'generates routes for users'
-      it { @app.route_for(:user_admin_posts).should     == '/users/:user_id/admin/posts' }
-      it { @app.route_for(:new_user_admin_post).should  == '/users/:user_id/admin/posts/new' }
-      it { @app.route_for(:user_admin_post).should      == '/users/:user_id/admin/posts/:id' }
-      it { @app.route_for(:edit_user_admin_post).should == '/users/:user_id/admin/posts/:id/edit' }
+      it { app.route_for(:user_admin_posts).should     == '/users/:user_id/admin/posts' }
+      it { app.route_for(:new_user_admin_post).should  == '/users/:user_id/admin/posts/new' }
+      it { app.route_for(:user_admin_post).should      == '/users/:user_id/admin/posts/:id' }
+      it { app.route_for(:edit_user_admin_post).should == '/users/:user_id/admin/posts/:id/edit' }
     end
 
     describe 'deep nested' do
       before do
-        @app.resources :users do
+        app.resources :users do
           resources :posts do
             resources :comments
           end
@@ -215,16 +211,16 @@ describe 'trails' do
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for nested user posts'
       describe 'exageration' do
-        it { @app.route_for(:user_post_comments).should     == '/users/:user_id/posts/:post_id/comments' }
-        it { @app.route_for(:new_user_post_comment).should  == '/users/:user_id/posts/:post_id/comments/new' }
-        it { @app.route_for(:user_post_comment).should      == '/users/:user_id/posts/:post_id/comments/:id' }
-        it { @app.route_for(:edit_user_post_comment).should == '/users/:user_id/posts/:post_id/comments/:id/edit' }
+        it { app.route_for(:user_post_comments).should     == '/users/:user_id/posts/:post_id/comments' }
+        it { app.route_for(:new_user_post_comment).should  == '/users/:user_id/posts/:post_id/comments/new' }
+        it { app.route_for(:user_post_comment).should      == '/users/:user_id/posts/:post_id/comments/:id' }
+        it { app.route_for(:edit_user_post_comment).should == '/users/:user_id/posts/:post_id/comments/:id/edit' }
       end
     end
 
     describe 'shallow deep nested' do
       before do
-        @app.resources :users, :shallow => true do
+        app.resources :users, :shallow => true do
           resources :posts do
             resources :comments
           end
@@ -237,7 +233,7 @@ describe 'trails' do
 
     describe 'nested shallow' do
       before do
-        @app.resources :users, :shallow => true do
+        app.resources :users, :shallow => true do
           resources :posts
         end
       end
@@ -247,7 +243,7 @@ describe 'trails' do
 
     describe 'hash nested' do
       before do
-        @app.resources :users => :posts
+        app.resources :users => :posts
       end
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for nested user posts'
@@ -255,18 +251,18 @@ describe 'trails' do
 
     describe 'hash nested with block' do
       before do
-        @app.resources :users => :posts do
+        app.resources :users => :posts do
           map :flag
         end
       end
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for nested user posts'
-      it { @app.route_for(:flag).should == '/flag' }
+      it { app.route_for(:flag).should == '/flag' }
     end
 
     describe 'nested shallow with hash' do
       before do
-        @app.resources :users => :posts, :shallow => true
+        app.resources :users => :posts, :shallow => true
       end
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for shallow user posts'
@@ -274,64 +270,64 @@ describe 'trails' do
 
     describe 'deep nested with hash' do
       before do
-        @app.resources :users => {:posts => :comments}
+        app.resources :users => {:posts => :comments}
       end
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for nested user posts'
       describe 'exageration' do
-        it { @app.route_for(:user_post_comments).should     == '/users/:user_id/posts/:post_id/comments' }
-        it { @app.route_for(:new_user_post_comment).should  == '/users/:user_id/posts/:post_id/comments/new' }
-        it { @app.route_for(:user_post_comment).should      == '/users/:user_id/posts/:post_id/comments/:id' }
-        it { @app.route_for(:edit_user_post_comment).should == '/users/:user_id/posts/:post_id/comments/:id/edit' }
+        it { app.route_for(:user_post_comments).should     == '/users/:user_id/posts/:post_id/comments' }
+        it { app.route_for(:new_user_post_comment).should  == '/users/:user_id/posts/:post_id/comments/new' }
+        it { app.route_for(:user_post_comment).should      == '/users/:user_id/posts/:post_id/comments/:id' }
+        it { app.route_for(:edit_user_post_comment).should == '/users/:user_id/posts/:post_id/comments/:id/edit' }
       end
     end
     
     describe 'deep nested shallow with hash' do
       before do
-        @app.resources :users => {:posts => :comments}, :shallow => true
+        app.resources :users => {:posts => :comments}, :shallow => true
       end
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for shallow user posts'
-      it { @app.route_for(:post_comments).should     == '/posts/:post_id/comments' }
-      it { @app.route_for(:new_post_comment).should  == '/posts/:post_id/comments/new' }
-      it { @app.route_for(:comment).should           == '/comments/:id' }
-      it { @app.route_for(:edit_comment).should      == '/comments/:id/edit' }
+      it { app.route_for(:post_comments).should     == '/posts/:post_id/comments' }
+      it { app.route_for(:new_post_comment).should  == '/posts/:post_id/comments/new' }
+      it { app.route_for(:comment).should           == '/comments/:id' }
+      it { app.route_for(:edit_comment).should      == '/comments/:id/edit' }
     end
 
     describe 'nested with array' do
       before do
-        @app.resources :users => [:posts, :comments]
+        app.resources :users => [:posts, :comments]
       end
-      it { @app.route_for(:users).should           == '/users' }
-      it { @app.route_for(:user_comments).should   == '/users/:user_id/comments' }
-      it { @app.route_for(:user_posts).should      == '/users/:user_id/posts' }
+      it { app.route_for(:users).should           == '/users' }
+      it { app.route_for(:user_comments).should   == '/users/:user_id/comments' }
+      it { app.route_for(:user_posts).should      == '/users/:user_id/posts' }
     end
   end
 
   describe 'resource' do
     before do
-      @app.resource :user => :profile
+      app.resource :user => :profile
     end
-    it { @app.route_for(:user).should               == '/user' }
-    it { @app.route_for(:new_user).should           == '/user/new' }
-    it { @app.route_for(:edit_user).should          == '/user/edit' }
-    it { @app.route_for(:user_profile).should       == '/user/profile' }
-    it { @app.route_for(:new_user_profile).should   == '/user/profile/new' }
-    it { @app.route_for(:edit_user_profile).should  == '/user/profile/edit' }
+    it { app.route_for(:user).should               == '/user' }
+    it { app.route_for(:new_user).should           == '/user/new' }
+    it { app.route_for(:edit_user).should          == '/user/edit' }
+    it { app.route_for(:user_profile).should       == '/user/profile' }
+    it { app.route_for(:new_user_profile).should   == '/user/profile/new' }
+    it { app.route_for(:edit_user_profile).should  == '/user/profile/edit' }
   end
 
   describe 'finding route for scope' do
     before do
-      @scope = Sinatra::Trails::Scope.new(@app, :admin)
+      @scope = Sinatra::Trails::Scope.new(app, :admin)
       @scope.generate_routes!{ map(:index) }
     end
 
-    it { @scope.find_route(:admin_index).should_not be_nil}
-    it { @scope.find_route(:index).should_not be_nil}
+    it { @scope.find_route(:admin_index).should_not be_nil }
+    it { @scope.find_route(:index).should_not be_nil }
+    it "should find resources index without full name"
   end
 
   describe 'sinatra integration' do
-    let(:app){ new_app } 
 
     describe 'delegation to sinatra and helpers' do
       before do
@@ -439,7 +435,7 @@ describe 'trails' do
   end
 
   # describe 'creating resource member within block' do
-  #   def app; @app ||= new_app end
+  #   def app; app ||= new_app end
   #   it 'should make path for resource member' do
   #     app.resources(:users) do
   #       get(users) { @resource.to_s }

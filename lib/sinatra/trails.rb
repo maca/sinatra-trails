@@ -13,27 +13,20 @@ module Sinatra
     class RouteNotDefined < Exception; end
 
     class Route
-      attr_reader :name, :full_name, :scope, :matcher, :keys, :to_route
+      attr_reader :name, :full_name, :scope, :keys, :to_route, :to_regexp
 
       def initialize route, name, ancestors, scope
-        # array of components, select regexps leave them like that, join
-        # the array contains nils as placeholders, everithing precompiled
+        @name        = name.to_s
+        @full_name   = ancestors.map { |ancestor| ancestor.name }.push(*name).compact.join('_')
         @components  = Array === route ? route.compact : route.to_s.scan(/[^\/]+/)
-        @full_name   = ancestors.map { |ancestor| ancestor.name }.push(*name).compact
-        @name        = @full_name.last.to_s
-        @full_name   = @full_name.join('_')
         @components.unshift *ancestors.map { |ancestor| ancestor.path }.compact
         @scope       = scope
         @to_route    = "/#{@components.join('/')}"
-        @matcher, @keys = Sinatra::Base.send(:compile, to_route)
-      end
-
-      def to_regexp
-        matcher
+        @to_regexp, @keys = Sinatra::Base.send(:compile, to_route)
       end
 
       def match str
-        @matcher.match str
+        to_regexp.match str
       end
 
       def to_path *args
@@ -97,7 +90,7 @@ module Sinatra
       end
 
       def match str
-        Regexp.union(*@routes.map{|route| route.matcher}).match str
+        Regexp.union(*@routes).match str
       end
 
       def routes_hash &block
