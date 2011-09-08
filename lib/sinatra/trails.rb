@@ -13,18 +13,27 @@ module Sinatra
     class RouteNotDefined < Exception; end
 
     class Route
-      attr_reader :name, :scope
+      attr_reader :name, :full_name, :scope, :matcher, :keys, :to_route
 
       def initialize route, name, ancestors, scope
+        # array of components, select regexps leave them like that, join
+        # the array contains nils as placeholders, everithing precompiled
         @components  = Array === route ? route.compact : route.to_s.scan(/[^\/]+/)
-        @name        = ancestors.map { |ancestor| ancestor.name }.push(*name).compact.join('_').to_sym
-        @scope       = scope
+        @full_name   = ancestors.map { |ancestor| ancestor.name }.push(*name).compact
+        @name        = @full_name.last
+        @full_name   = @full_name.join('_').to_sym
         @components.unshift *ancestors.map { |ancestor| ancestor.path }.compact
-        @components.flatten!
+        @scope       = scope
+        @to_route    = "/#{@components.join('/')}"
+        @matcher, @keys = Sinatra::Base.send(:compile, to_route)
       end
 
-      def to_route
-        "/#{@components.join('/')}"
+      def to_regexp
+        matcher
+      end
+
+      def match str
+        @matcher.match str
       end
 
       def to_path *args
@@ -53,7 +62,7 @@ module Sinatra
         @sinatra_app = app
       end
 
-      def match name, opts = {}, &block
+      def map name, opts = {}, &block
         path = opts.delete(:to) || name
         @routes << route = Route.new(path, name, [*ancestors, self], self)
         instance_eval &block if block_given?
@@ -72,22 +81,40 @@ module Sinatra
         restful_routes Resources, names, &block
       end
 
+      def before *args, &block
+        opts = Hash === args.last ? args.pop : {}
+        if args.empty?
+          path = self
+        else
+          path = Regexp.union *args.map{ |element| Sinatra::Base.send(:compile, element).first }
+        end
+        @sinatra_app.before path, opts, &block
+      end
+
       def generate_routes! &block
         instance_eval &block if block_given?
         @routes
       end
 
+      def match str
+        Regexp.union(*@routes.map{|route| route.matcher}).match str
+      end
+
       def routes_hash &block
-        Hash[*generate_routes!(&block).map{ |route| [route.name, route]}.flatten]
+        Hash[*generate_routes!(&block).map{ |route| [route.full_name, route]}.flatten]
+      end
+
+      def find_route name
+        @routes.find{ |route| route.full_name == name || route.scope == self && route.name.to_sym == name }
       end
 
       private
       def method_missing name, *args, &block
-        if route = @routes.find{ |route| route.name == name }
-          return route.to_route unless block_given?
+        if route = find_route(name)
+          return route unless block_given?
           @routes = @routes | route.scope.generate_routes!(&block)
         else
-          @sinatra_app.send name, *args, &block 
+          @sinatra_app.send(name, *args, &block)
         end
       end
 
@@ -138,7 +165,7 @@ module Sinatra
       def member action = nil
         ancestors = [OpenStruct.new(:name => action, :path => nil), *self.ancestors]
         @routes << route = Route.new([name, action], name, ancestors, self)
-        route.to_route
+        route
       end
 
       def generate_routes! &block
@@ -165,14 +192,14 @@ module Sinatra
         ancestors = [OpenStruct.new(:name => action, :path => nil), *self.ancestors]
         ancestors[0, ancestors.size - 1] = ancestors[0..-2].reject{ |ancestor| self.class === ancestor } if opts[:shallow]
         @routes << route = Route.new([plural_name, action], [action == :new ? name : plural_name], ancestors, self)
-        route.to_route
+        route
       end
 
       def member action = nil
         ancestors = [OpenStruct.new(:name => action, :path => nil), *self.ancestors]
         ancestors.reject!{ |ancestor| self.class === ancestor } if opts[:shallow]
         @routes << route = Route.new([plural_name, ':id', action], name, ancestors, self)
-        route.to_route
+        route
       end
 
       def generate_routes! &block
@@ -186,8 +213,8 @@ module Sinatra
       @named_routes.merge! Scope.new(self, name).routes_hash(&block)
     end
 
-    def match name, opts = {}, &block
-      namespace(nil) { match name, opts, &block }
+    def map name, opts = {}, &block
+      namespace(nil) { map name, opts, &block }
       route_for name
     end
 

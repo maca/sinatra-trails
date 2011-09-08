@@ -13,12 +13,12 @@ describe 'trails' do
     @app = new_app
   end
 
-  describe 'match' do
+  describe 'map' do
     describe 'basic' do
       before do
-        @app.match :home, :to => '/'
-        @app.match :dashboard
-        @app.match :edit_user, :to => '/users/:id/edit'
+        @app.map :home, :to => '/'
+        @app.map :dashboard
+        @app.map :edit_user, :to => '/users/:id/edit'
       end
 
       describe 'routes' do
@@ -53,8 +53,8 @@ describe 'trails' do
     describe 'with namespace' do
       before do
         @app.namespace '/admin' do
-          match :dashboard
-          match :logout
+          map :dashboard
+          map :logout
         end
       end
       it { @app.route_for(:dashboard).should == '/admin/dashboard' }
@@ -64,7 +64,7 @@ describe 'trails' do
     describe 'with named namespace' do
       before do
         @app.namespace :admin do
-          match :dashboard
+          map :dashboard
         end
       end
       it { @app.route_for(:admin_dashboard).should == '/admin/dashboard' }
@@ -73,12 +73,12 @@ describe 'trails' do
     describe 'with nested namespace' do
       before do
         @app.namespace '/blog' do
-          match :users
+          map :users
           namespace '/admin' do
-            match :dashboard
+            map :dashboard
             namespace '/auth' do
-              match :logout
-              match :login
+              map :logout
+              map :login
             end
           end
         end
@@ -92,12 +92,12 @@ describe 'trails' do
     describe 'with named nested namespace' do
       before do
         @app.namespace :blog do
-          match :users
+          map :users
           namespace :admin do
-            match :dashboard
+            map :dashboard
             namespace :auth do
-              match :logout
-              match :login
+              map :logout
+              map :login
             end
           end
         end
@@ -159,7 +159,7 @@ describe 'trails' do
     describe 'basic' do
       before do
         @app.resources :users, :posts do
-          match :flag
+          map :flag
         end
       end
       it_should_behave_like 'generates routes for users'
@@ -256,7 +256,7 @@ describe 'trails' do
     describe 'hash nested with block' do
       before do
         @app.resources :users => :posts do
-          match :flag
+          map :flag
         end
       end
       it_should_behave_like 'generates routes for users'
@@ -320,48 +320,132 @@ describe 'trails' do
     it { @app.route_for(:edit_user_profile).should  == '/user/profile/edit' }
   end
 
-  describe 'sinatra integration' do
-    def app; @app ||= new_app end
+  describe 'finding route for scope' do
+    before do
+      @scope = Sinatra::Trails::Scope.new(@app, :admin)
+      @scope.generate_routes!{ map(:index) }
+    end
 
-    it "should delegate to sinatra and have access to named routes" do
-      app.match(:home) { get(home){ path_for(:home) } }
-      app.instance_eval { get(match(:about)){ url_for(:about) } }
-      get '/home'
-      last_response.body.should == '/home'
-      get '/about'
-      last_response.body.should == 'http://example.org/about'
+    it { @scope.find_route(:admin_index).should_not be_nil}
+    it { @scope.find_route(:index).should_not be_nil}
+  end
+
+  describe 'sinatra integration' do
+    let(:app){ new_app } 
+
+    describe 'delegation to sinatra and helpers' do
+      before do
+        app.map(:home) { get(home){ path_for(:home) } }
+        app.instance_eval { get(map(:about)){ url_for(:about) } }
+      end
+
+      it "should get path for route" do
+        get '/home'
+        last_response.body.should == '/home'
+      end
+
+      it "should get url for route" do
+        get '/about'
+        last_response.body.should == 'http://example.org/about'
+      end
+    end
+
+    describe 'using route as scope' do
+      before do
+        app.resources(:users => :posts, :shallow => true) do
+          users do
+            get(member(:aprove)) { path_for(:aprove_user, params[:id]) }
+          end
+
+          user_posts do
+            get(member(:aprove)) { path_for(:aprove_post, params[:id]) }
+          end
+        end
+      end
+
+      it 'should define action for users member' do
+        get '/users/1/aprove'
+        last_response.body.should == '/users/1/aprove'
+      end
+
+      it 'should define action for user_posts member' do
+        get '/posts/1/aprove'
+        last_response.body.should == '/posts/1/aprove'
+      end
+    end
+
+    describe 'before without args' do
+      before do
+        app.instance_eval do
+          namespace(:admin) do 
+            before { @admin = true }
+            get map(:index, :to => '/') do
+              @admin.to_s
+            end
+          end
+
+          namespace(:not_admin) do
+            get map(:index, :to => '/') do
+              @admin.to_s
+            end
+          end
+        end
+      end
+
+      it 'should set before filter within scope' do
+        get '/admin'
+        last_response.body.should == 'true'
+      end
+
+      it 'should not set before filter outside scope' do
+        get '/not_admin'
+        last_response.body.should == ''
+      end
+    end
+
+    describe 'before passing routes' do
+      before do
+        app.instance_eval do
+          namespace(:admin) do 
+            get map(:index, :to => '/') do
+              @auth.to_s
+            end
+
+            get map(:sign_in, :to => '/sign_in') do
+              @auth.to_s
+            end
+
+            get map(:sign_up, :to => '/sign_up') do
+              @auth.to_s
+            end
+
+            before(admin_sign_in, admin_sign_up) { @auth = true }
+          end
+        end
+      end
+
+      it 'should set before filter for passed routes' do
+        get '/admin/sign_in'
+        last_response.body.should == 'true'
+        get '/admin/sign_up'
+        last_response.body.should == 'true'
+      end
+
+      it 'should not set before filter for not passed routes' do
+        get '/admin'
+        last_response.body.should == ''
+      end
     end
   end
 
-  describe 'creating resource member within block' do
-    def app; @app ||= new_app end
-
-    it 'should make path for resource member' do
-      app.resources(:users => :posts, :shallow => true) do
-        users do
-          get(member(:aprove)) { path_for(:aprove_user, params[:id]) }
-        end
-
-        user_posts do
-          get(member(:aprove)) { path_for(:aprove_post, params[:id]) }
-        end
-      end
-      get '/users/1/aprove'
-      last_response.body.should == '/users/1/aprove'
-      get '/posts/1/aprove'
-      last_response.body.should == '/posts/1/aprove'
-    end
-  end 
-
-  describe 'creating resource member within block' do
-    def app; @app ||= new_app end
-
-    it 'should make path for resource member' do
-      app.resources(:users) do
-        get(users) { params[:resource_name] }
-      end
-      get '/users'
-      last_response.body.should == 'user'
-    end
-  end 
+  # describe 'creating resource member within block' do
+  #   def app; @app ||= new_app end
+  #   it 'should make path for resource member' do
+  #     app.resources(:users) do
+  #       get(users) { @resource.to_s }
+  #     end
+  #     get '/users'
+  #     last_response.body.should == 'user'
+  #   end
+  # end 
 end
