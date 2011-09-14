@@ -17,13 +17,14 @@ module Sinatra
       Match = Struct.new(:captures)
 
       def initialize route, name, ancestors, scope
-        @name        = name.to_s
-        @full_name   = ancestors.map { |ancestor| ancestor.name }.push(name).tap{ |names| puts names.inspect }.compact.join('_')
+        @name        = [*name].last
+        @full_name   = ancestors.map { |ancestor| Symbol === ancestor ? ancestor : (ancestor && ancestor.name) }.push(*name).select{ |name| Symbol === name }.tap{ |names| puts names.inspect }.join('_')
         @components  = Array === route ? route.compact : route.to_s.scan(/[^\/]+/)
-        @components.unshift *ancestors.map { |ancestor| ancestor.path }.compact
+        @components.unshift *ancestors.map { |ancestor| ancestor.path if ancestor.respond_to?(:path) }.compact
         @scope       = scope
         @captures    = []
         compile!
+        puts @name.inspect
       end
 
       def match str
@@ -92,7 +93,6 @@ module Sinatra
 
     class Scope
       attr_reader :name, :path, :ancestors, :routes
-      Action = Struct.new(:name, :path)
 
       def initialize app, path, ancestors = []
         @ancestors, @routes = ancestors, []
@@ -188,7 +188,7 @@ module Sinatra
         end
       end
     end
-
+  
     class Resource < Scope
       def initialize app, name, ancestors, opts
         super app, name, ancestors
@@ -196,8 +196,8 @@ module Sinatra
       end
 
       def member action = nil
-        ancestors = [Action.new(action, nil), *self.ancestors, self]
-        @routes << route = Route.new(action, nil, ancestors, self)
+        ancestors = [action, *self.ancestors, name]
+        @routes << route = Route.new([name, action], action.to_s, ancestors, self)
         route
       end
 
@@ -213,32 +213,45 @@ module Sinatra
       def initialize app, name, ancestors, opts
         super app, name, ancestors
         @opts        = opts
-        @plural_name = @path
-        @name        = @plural_name.singularize
+        @name        = name.to_s.singularize.to_sym
+        @plural_name = name.to_sym
       end
 
       def path
         [plural_name, ":#{name}_id"]
       end
 
-      def collection action = nil
-        ancestors = [Action.new(action, nil), *self.ancestors]
-        ancestors[0, ancestors.size - 1] = ancestors[0..-2].reject{ |ancestor| self.class === ancestor } if opts[:shallow]
-        route_name = action == :new ? name : plural_name
-        @routes << route = Route.new([plural_name, action], route_name, ancestors, self)
+      def collection action
+        ancestors  = [*self.ancestors, action == :new ? name : plural_name]
+        path       = [plural_name]
+
+        unless action == :index
+          ancestors.unshift action
+          path.push action
+        end
+
+        ancestors[0, ancestors.size - 2] = ancestors[0..-3].reject{ |ancestor| self.class === ancestor } if opts[:shallow]
+        @routes << route = Route.new(path, action.to_s, ancestors, self)
         route
       end
 
-      def member action = nil
-        ancestors = [Action.new(action, nil), *self.ancestors]
+      def member action
+        ancestors = [*self.ancestors, name]
+        path      = [plural_name, ':id']
+
+        unless action == :show
+          ancestors  = [action, *ancestors]
+          path.push action
+        end
+
         ancestors.reject!{ |ancestor| self.class === ancestor } if opts[:shallow]
-        @routes << route = Route.new([plural_name, ':id', action], name, ancestors, self)
+        @routes << route = Route.new(path, action.to_s, ancestors, self)
         route
       end
 
       def generate_routes! &block
-        collection and collection(:new)
-        member and member(:edit)
+        collection(:index) and collection(:new)
+        member(:show) and member(:edit)
         super
       end
     end

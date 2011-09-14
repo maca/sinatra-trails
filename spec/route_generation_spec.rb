@@ -11,7 +11,7 @@ describe 'trails' do
 
   describe 'map' do
     describe 'basic' do
-      before do
+      before :all do
         app.map :home, :to => '/'
         app.map :dashboard
         app.map :edit_user, :to => '/users/:id/edit'
@@ -47,7 +47,7 @@ describe 'trails' do
     end
 
     describe 'with namespace' do
-      before do
+      before :all do
         app.namespace '/admin' do
           map :dashboard
           map :logout
@@ -58,7 +58,7 @@ describe 'trails' do
     end
 
     describe 'with named namespace' do
-      before do
+      before :all do
         app.namespace :admin do
           map :dashboard
         end
@@ -67,7 +67,7 @@ describe 'trails' do
     end
 
     describe 'with nested namespace' do
-      before do
+      before :all do
         app.namespace '/blog' do
           map :users
           namespace '/admin' do
@@ -86,7 +86,7 @@ describe 'trails' do
     end
 
     describe 'with named nested namespace' do
-      before do
+      before :all do
         app.namespace :blog do
           map :users
           namespace :admin do
@@ -153,19 +153,18 @@ describe 'trails' do
     end
 
     describe 'basic' do
-      before do
+      before :all do
         app.resources :users, :posts do
-          map :flag
+          # map :flag
         end
-        app.trails
       end
-      # it_should_behave_like 'generates routes for users'
-      # it_should_behave_like 'generates routes for posts'
-      it { app.route_for(:flag).should == '/flag' }
+      it_should_behave_like 'generates routes for users'
+      it_should_behave_like 'generates routes for posts'
+      # it { app.route_for(:flag).should == '/flag' }
     end
 
     describe 'nested with block' do
-      before do
+      before :all do
         app.resources :users do
           resources :posts
         end
@@ -175,7 +174,7 @@ describe 'trails' do
     end
 
     describe 'with namespace' do
-      before do
+      before :all do
         app.namespace :admin do
           resources :users
         end
@@ -187,7 +186,7 @@ describe 'trails' do
     end
 
     describe 'nested with block and namespace' do
-      before do
+      before :all do
         app.resources :users do
           namespace :admin do
             resources :posts
@@ -202,7 +201,7 @@ describe 'trails' do
     end
 
     describe 'deep nested' do
-      before do
+      before :all do
         app.resources :users do
           resources :posts do
             resources :comments
@@ -220,7 +219,7 @@ describe 'trails' do
     end
 
     describe 'shallow deep nested' do
-      before do
+      before :all do
         app.resources :users, :shallow => true do
           resources :posts do
             resources :comments
@@ -233,7 +232,7 @@ describe 'trails' do
     end
 
     describe 'nested shallow' do
-      before do
+      before :all do
         app.resources :users, :shallow => true do
           resources :posts
         end
@@ -243,7 +242,7 @@ describe 'trails' do
     end
 
     describe 'hash nested' do
-      before do
+      before :all do
         app.resources :users => :posts
       end
       it_should_behave_like 'generates routes for users'
@@ -251,7 +250,7 @@ describe 'trails' do
     end
 
     describe 'hash nested with block' do
-      before do
+      before :all do
         app.resources :users => :posts do
           map :flag
         end
@@ -262,7 +261,7 @@ describe 'trails' do
     end
 
     describe 'nested shallow with hash' do
-      before do
+      before :all do
         app.resources :users => :posts, :shallow => true
       end
       it_should_behave_like 'generates routes for users'
@@ -270,7 +269,7 @@ describe 'trails' do
     end
 
     describe 'deep nested with hash' do
-      before do
+      before :all do
         app.resources :users => {:posts => :comments}
       end
       it_should_behave_like 'generates routes for users'
@@ -296,7 +295,7 @@ describe 'trails' do
     end
 
     describe 'nested with array' do
-      before do
+      before :all do
         app.resources :users => [:posts, :comments]
       end
       it { app.route_for(:users).should           == '/users' }
@@ -318,7 +317,7 @@ describe 'trails' do
   end
 
   describe 'finding route for scope' do
-    before do
+    before :all do
       @scope = Sinatra::Trails::Scope.new(app, :admin)
       @scope.generate_routes!{ map(:index) }
     end
@@ -329,7 +328,7 @@ describe 'trails' do
   end
 
   describe 'finding route for resources' do
-    before do
+    before :all do
       @scope = Sinatra::Trails::Resources.new(app, :users, [], {})
       @scope.generate_routes!
     end
@@ -340,7 +339,7 @@ describe 'trails' do
   end
 
   describe 'finding route for resources' do
-    before do
+    before :all do
       @scope = Sinatra::Trails::Resources.new(app, :users, [], {})
       @scope.generate_routes! do
         resources :posts
@@ -354,7 +353,7 @@ describe 'trails' do
 
   describe 'sinatra integration' do
     describe 'delegation to sinatra and helpers' do
-      before do
+      before :all do
         app.map(:home) { get(home){ path_for(:home) } }
         app.instance_eval { get(map(:about)){ url_for(:about) } }
       end
@@ -371,7 +370,7 @@ describe 'trails' do
     end
 
     describe 'using route as scope' do
-      before do
+      before :all do
         app.resources(:users => :posts, :shallow => true) do
           users do
             get(member(:aprove)) { path_for(:aprove_user, params[:id]) }
@@ -395,7 +394,7 @@ describe 'trails' do
     end
 
     describe 'before without args' do
-      before do
+      before :all do
         app.instance_eval do
           namespace(:admin) do 
             before { @admin = true }
@@ -424,7 +423,7 @@ describe 'trails' do
     end
 
     describe 'before passing routes' do
-      before do
+      before :all do
         app.instance_eval do
           namespace(:admin) do 
             get map(:index, :to => '/') do
@@ -458,7 +457,7 @@ describe 'trails' do
     end
 
     describe 'before filter lazy match passing symbols' do
-      before do
+      before :all do
         app.instance_eval do
           namespace(:admin) do 
             before(:admin_sign_in, :admin_sign_up) { @auth = true }
@@ -492,7 +491,7 @@ describe 'trails' do
     end
 
     describe 'having access to resource name' do
-      before do
+      before :all do
         app.resources(:users => :posts) do
           get(users){ params[:resource].to_s }
           get(user_posts){ params[:resource].to_s }
@@ -511,7 +510,7 @@ describe 'trails' do
     end
 
     describe 'having access to namespace and action' do
-      before do
+      before :all do
         app.namespace(:admin) do
           get(map(:index, :to => '/')){ params[:namespace].to_s }
           get(map(:sign_in)){ params[:action].to_s }
@@ -529,19 +528,19 @@ describe 'trails' do
       end
     end
 
-    # describe 'finding the right route for resources' do
-    #   it 'should find the right route' do
-    #     app.resources(:users) do
-    #       users.to_route.should     == '/users'
-    #       new_user.to_route.should  == '/users/new'
-    #       user.to_route.should      == '/users/:id'
-    #       edit_user.to_route.should == '/users/:id/edit'
-    #     end
-    #   end
-    # end
+    describe 'finding the right route for resources' do
+      it 'should find the right route' do
+        app.resources(:users) do
+          users.to_route.should     == '/users'
+          new_user.to_route.should  == '/users/new'
+          user.to_route.should      == '/users/:id'
+          edit_user.to_route.should == '/users/:id/edit'
+        end
+      end
+    end
 
     # describe 'having access to action for resources' do
-    #   before do
+    #   before :all do
     #     app.resources(:users) do
     #       puts user.to_route
     #       get(users){ params[:action].to_s }
