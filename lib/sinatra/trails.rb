@@ -188,14 +188,21 @@ module Sinatra
         @opts = opts
       end
 
-      def member action = nil
-        ancestors = [action, *self.ancestors, name]
-        @routes << route = Route.new([name, action], action.to_s, ancestors, self)
+      def member action
+        ancestors = [*self.ancestors, name]
+        path      = [name]
+          
+        unless action == :show
+          ancestors.unshift action
+          path.push action
+        end
+
+        @routes << route = Route.new(path, action.to_s, ancestors, self)
         route
       end
 
       def generate_routes! &block
-        member and member(:new) and member(:edit)
+        member(:show) and member(:new) and member(:edit)
         super
       end
     end
@@ -233,7 +240,7 @@ module Sinatra
         path      = [plural_name, ':id']
 
         unless action == :show
-          ancestors  = [action, *ancestors]
+          ancestors.unshift action
           path.push action
         end
 
