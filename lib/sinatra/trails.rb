@@ -64,24 +64,17 @@ module Sinatra
     end
 
     class ScopeMatcher
-      def initialize scope, paths
-        @scope, @paths = scope, paths
+      def initialize scope, matchers
+        @scope = scope
+        @names, @matchers = matchers.partition { |el| Symbol === el }
       end
       
       def match str
-        if @paths.empty?
-          matchers = @scope.routes
+        if @matchers.empty? && @names.empty?
+          Regexp.union(@scope.routes).match str
         else
-          matchers = @paths.map do |element| 
-            case element
-            when Route then element
-            when Symbol then @scope[element]
-            else
-              Sinatra::Base.send(:compile, element).first
-            end
-          end
+          Regexp.union(*@matchers, *@names.map{ |name| @scope[name] }).match str
         end
-        Regexp.union(matchers).match str
       end
     end
 
