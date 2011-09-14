@@ -17,14 +17,19 @@ module Sinatra
       Match = Struct.new(:captures)
 
       def initialize route, name, ancestors, scope
-        @name        = [*name].last
-        @full_name   = ancestors.map { |ancestor| Symbol === ancestor ? ancestor : (ancestor && ancestor.name) }.push(*name).select{ |name| Symbol === name }.tap{ |names| puts names.inspect }.join('_')
+        @name        = name.to_s
+        @full_name   = ancestors.map { |ancestor| Scope === ancestor ? ancestor.name : ancestor }.push(name).select{ |name| Symbol === name }.join('_')
         @components  = Array === route ? route.compact : route.to_s.scan(/[^\/]+/)
-        @components.unshift *ancestors.map { |ancestor| ancestor.path if ancestor.respond_to?(:path) }.compact
+        @components.unshift *ancestors.map { |ancestor| ancestor.path if Scope === ancestor }.compact
         @scope       = scope
         @captures    = []
-        compile!
-        puts @name.inspect
+        @to_route    = "/#{@components.join('/')}"
+        namespace    = ancestors.reverse.find { |ancestor| ancestor.class == Scope && ancestor.name }
+
+        @to_regexp, @keys = Sinatra::Base.send(:compile, to_route)
+        add_param 'resource', scope.name if [Resource, Resources].include?(scope.class)
+        add_param 'namespace', namespace.name if namespace
+        add_param 'action', name
       end
 
       def match str
@@ -49,20 +54,8 @@ module Sinatra
       end
 
       private
-      def compile!
-        @to_route = "/#{@components.join('/')}"
-        @to_regexp, @keys = Sinatra::Base.send(:compile, to_route)
-        case scope
-        when Resource, Resources
-          add_key 'resource', scope.name
-        when Scope
-          add_key 'namespace', scope.name
-        end
-          add_key 'action', name
-      end
-
-      def add_key key, capture
-        unless keys.include?(key)
+      def add_param key, capture
+        unless keys.include? key
           @keys << key
           @captures << capture
         end

@@ -539,32 +539,35 @@ describe 'trails' do
       end
     end
 
-    # describe 'having access to action for resources' do
-    #   before :all do
-    #     app.resources(:users) do
-    #       puts user.to_route
-    #       get(users){ params[:action].to_s }
-    #       get(new_user){ params[:action].to_s }
-    #       get(user){ params[:action].to_s }
-    #       get(edit_user){ params[:action].to_s }
-    #     end
-    #   end
-    #   it 'should set index as action' do
-    #     get '/users'
-    #     last_response.body.should == 'index'
-    #   end
-    #   it 'should set index as show' do
-    #     get '/users/1'
-    #     last_response.body.should == 'show'
-    #   end
-    #   it 'should set index as new' do
-    #     get '/users/new'
-    #     last_response.body.should == 'new'
-    #   end
-    #   it 'should set index as edit' do
-    #     get '/users/1/edit'
-    #     last_response.body.should == 'edit'
-    #   end
-    # end
+    describe 'having access to action for resources' do
+      before :all do
+        app.resources(:users) do
+          get(users){ params[:action].to_s }
+          get(new_user){ params[:action].to_s }
+          get(user){ params[:action].to_s }
+          get(edit_user){ params[:action].to_s }
+        end
+      end
+
+      it 'should set index as action' do
+        get '/users'
+        last_response.body.should == 'index'
+      end
+
+      it 'should set index as show' do
+        get '/users/1'
+        last_response.body.should == 'show'
+      end
+
+      it 'should set index as new' do
+        get '/users/new'
+        last_response.body.should == 'new'
+      end
+
+      it 'should set index as edit' do
+        get '/users/1/edit'
+        last_response.body.should == 'edit'
+      end
+    end
   end
 end
