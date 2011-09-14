@@ -30,6 +30,7 @@ module Sinatra
         add_param 'resource', scope.name if [Resource, Resources].include?(scope.class)
         add_param 'namespace', namespace.name if namespace
         add_param 'action', name
+        scope.routes << self
       end
 
       def match str
@@ -96,7 +97,7 @@ module Sinatra
 
       def map name, opts = {}, &block
         path = opts.delete(:to) || name
-        @routes << route = Route.new(path, name, [*ancestors, self], self)
+        route = Route.new(path, name, [*ancestors, self], self)
         instance_eval &block if block_given?
         route
       end
@@ -197,8 +198,7 @@ module Sinatra
           path.push action
         end
 
-        @routes << route = Route.new(path, action.to_s, ancestors, self)
-        route
+        Route.new(path, action.to_s, ancestors, self)
       end
 
       def generate_routes! &block
@@ -231,8 +231,7 @@ module Sinatra
         end
 
         ancestors[0, ancestors.size - 2] = ancestors[0..-3].reject{ |ancestor| self.class === ancestor } if opts[:shallow]
-        @routes << route = Route.new(path, action.to_s, ancestors, self)
-        route
+        Route.new(path, action.to_s, ancestors, self)
       end
 
       def member action
@@ -245,8 +244,7 @@ module Sinatra
         end
 
         ancestors.reject!{ |ancestor| self.class === ancestor } if opts[:shallow]
-        @routes << route = Route.new(path, action.to_s, ancestors, self)
-        route
+        Route.new(path, action.to_s, ancestors, self)
       end
 
       def generate_routes! &block
