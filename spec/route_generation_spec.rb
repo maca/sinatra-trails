@@ -154,7 +154,7 @@ describe 'trails' do
 
     describe 'basic' do
       before :all do
-        app.resources :users, :posts do
+        app.resources :users, 'posts' do
           # map :flag
         end
       end

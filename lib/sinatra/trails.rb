@@ -141,7 +141,7 @@ module Sinatra
       def restful_routes builder, names, &block
         opts = {}
         hash = Hash === names.last ? names.pop : {}
-        hash.delete_if { |key, val| opts[key] = val if !(Symbol === val || Hash === val || Array === val) }
+        hash.delete_if { |key, val| opts[key] = val if !(Symbol === val || Enumerable === val) }
 
         nested = []
         mash = Proc.new do |hash, acc|
@@ -177,59 +177,15 @@ module Sinatra
     end
   
     class Resource < Scope
+      attr_reader :opts
       def initialize app, name, ancestors, opts
-        super app, name, ancestors
+        super app, name.to_sym, ancestors
         @opts = opts
       end
 
       def member action
         ancestors = [*self.ancestors, name]
-        path      = [name]
-          
-        unless action == :show
-          ancestors.unshift action
-          path.push action
-        end
-
-        Route.new(path, action.to_s, ancestors, self)
-      end
-
-      def generate_routes! &block
-        member(:show) and member(:new) and member(:edit)
-        super
-      end
-    end
-
-    class Resources < Scope
-      attr_reader :plural_name, :name_prefix, :route_scope, :opts
-
-      def initialize app, name, ancestors, opts
-        super app, name, ancestors
-        @opts        = opts
-        @name        = name.to_s.singularize.to_sym
-        @plural_name = name.to_sym
-      end
-
-      def path
-        [plural_name, ":#{name}_id"]
-      end
-
-      def collection action
-        ancestors  = [*self.ancestors, action == :new ? name : plural_name]
-        path       = [plural_name]
-
-        unless action == :index
-          ancestors.unshift action
-          path.push action
-        end
-
-        ancestors[0, ancestors.size - 2] = ancestors[0..-3].reject{ |ancestor| self.class === ancestor } if opts[:shallow]
-        Route.new(path, action.to_s, ancestors, self)
-      end
-
-      def member action
-        ancestors = [*self.ancestors, name]
-        path      = [plural_name, ':id']
+        path      = @plural_name ? [plural_name, ':id'] : [name]
 
         unless action == :show
           ancestors.unshift action
@@ -241,9 +197,42 @@ module Sinatra
       end
 
       def generate_routes! &block
+        define_routes and super
+      end
+      
+      private
+      def define_routes
+        member(:show) and member(:new) and member(:edit)
+      end
+    end
+
+    class Resources < Resource
+      attr_reader :plural_name, :name_prefix
+
+      def initialize app, raw_name, ancestors, opts
+        super
+        @plural_name = name
+        @name        = name.to_s.singularize.to_sym
+        @path        = [plural_name, ":#{name}_id"]
+      end
+
+      def collection action
+        ancestors  = [*self.ancestors, action == :new ? name : plural_name]
+        path       = [plural_name]
+
+        unless action == :index
+          ancestors.unshift action
+          path.push action
+        end
+
+        ancestors[0, ancestors.size - 2] = ancestors[0..-3].reject{ |ancestor| Resource === ancestor } if opts[:shallow]
+        Route.new(path, action.to_s, ancestors, self)
+      end
+
+      private
+      def define_routes
         collection(:index) and collection(:new)
         member(:show) and member(:edit)
-        super
       end
     end
 
