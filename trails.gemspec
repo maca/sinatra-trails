@@ -1,17 +1,17 @@
 # -*- encoding: utf-8 -*-
 $:.push File.expand_path("../lib", __FILE__)
-require "trails/version"
+require "sinatra/trails/version"
 
 Gem::Specification.new do |s|
-  s.name        = "trails"
-  s.version     = Trails::VERSION
+  s.name        = "sinatra-trails"
+  s.version     = Sinatra::Trails::VERSION
   s.authors     = ["Macario"]
   s.email       = ["macarui@gmail.com"]
   s.homepage    = "http://github.com/maca/trails"
   s.summary     = %q{A named routes Sinatra DSL inspired by Rails routing}
   s.description = %q{A named routes Sinatra DSL inspired by Rails routing}
 
-  s.rubyforge_project = "trails"
+  s.rubyforge_project = "sinatra-trails"
   s.add_dependency 'sinatra'
   s.add_dependency 'i18n'
   s.add_dependency 'activesupport', '>= 3.0'

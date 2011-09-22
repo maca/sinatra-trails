@@ -4,7 +4,7 @@ require 'rack/test'
 
 $:.unshift File.join(File.dirname( __FILE__), '..', 'lib') 
 
-require 'trails'
+require 'sinatra/trails'
 
 RSpec::Matchers.define :match_route do |expected|
   match do |actual|
