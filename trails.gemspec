@@ -1,13 +1,13 @@
 # -*- encoding: utf-8 -*-
 $:.push File.expand_path("../lib", __FILE__)
-require "sinatra/trails/version"
+require "trails/version"
 
 Gem::Specification.new do |s|
   s.name        = "trails"
-  s.version     = Sinatra::Trails::VERSION
+  s.version     = Trails::VERSION
   s.authors     = ["Macario"]
   s.email       = ["macarui@gmail.com"]
-  s.homepage    = "http://github.com/maca/sinatra-trails"
+  s.homepage    = "http://github.com/maca/trails"
   s.summary     = %q{TODO: Write a gem summary}
   s.description = %q{TODO: Write a gem description}
 

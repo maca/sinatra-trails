@@ -5,7 +5,7 @@ describe 'trails' do
 
   let(:app) do
     app = Class.new(Sinatra::Base)
-    app.register Sinatra::Trails
+    app.register Trails
     app.set :environment, :test
   end
 
@@ -21,7 +21,7 @@ describe 'trails' do
         it { app.route_for(:home).should       == '/' }
         it { app.route_for(:dashboard).should  == '/dashboard' }
         it { app.route_for('dashboard').should == '/dashboard' }
-        it { lambda{ app.route_for(:missing) }.should raise_error Sinatra::Trails::RouteNotDefined }
+        it { lambda{ app.route_for(:missing) }.should raise_error Trails::RouteNotDefined }
       end
 
       describe 'paths' do
@@ -318,7 +318,7 @@ describe 'trails' do
 
   describe 'finding route for scope' do
     before :all do
-      @scope = Sinatra::Trails::Scope.new(app, :admin)
+      @scope = Trails::Scope.new(app, :admin)
       @scope.generate_routes!{ map(:index) }
     end
 
@@ -329,7 +329,7 @@ describe 'trails' do
 
   describe 'finding route for resources' do
     before :all do
-      @scope = Sinatra::Trails::Resources.new(app, :users, [], {})
+      @scope = Trails::Resources.new(app, :users, [], {})
       @scope.generate_routes!
     end
     it { @scope.route_for(:users).should_not be_nil }
@@ -340,7 +340,7 @@ describe 'trails' do
 
   describe 'finding route for resources' do
     before :all do
-      @scope = Sinatra::Trails::Resources.new(app, :users, [], {})
+      @scope = Trails::Resources.new(app, :users, [], {})
       @scope.generate_routes! do
         resources :posts
       end
