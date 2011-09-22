@@ -570,4 +570,26 @@ describe 'trails' do
       end
     end
   end
+
+  describe 'accessing routes from outside the app by module inclusion' do
+    let(:other_app) do
+      app = Class.new(Sinatra::Base)
+      app.register Trails
+      app.set :environment, :test
+    end
+
+    let(:klass) { Class.new }
+
+    before :all do
+      app.map :heaven
+      other_app.map :hell
+      klass.send :include, app::Routes
+      klass.send :include, other_app::Routes
+      @obj = klass.new
+    end
+     
+    it { @obj.path_for(:heaven).should == '/heaven' }
+    it { @obj.path_for(:hell).should   == '/hell' }
+    it { lambda{ @obj.path_for(:purgatory) }.should raise_error Trails::RouteNotDefined }
+  end
 end

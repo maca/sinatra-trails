@@ -185,11 +185,7 @@ module Trails
       ancestors = [*self.ancestors, name]
       path      = @plural_name ? [plural_name, ':id'] : [name]
 
-      unless action == :show
-        ancestors.unshift action
-        path.push action
-      end
-
+      ancestors.unshift(action) and path.push(action) unless action == :show
       ancestors.reject!{ |ancestor| Resource === ancestor } if opts[:shallow]
       Route.new(path, action.to_s, ancestors, self)
     end
@@ -217,11 +213,7 @@ module Trails
     def collection action
       ancestors  = [*self.ancestors, action == :new ? name : plural_name]
       path       = [plural_name]
-
-      unless action == :index
-        ancestors.unshift action
-        path.push action
-      end
+      ancestors.unshift(action) and path.push(action) unless action == :index
 
       ancestors[0, ancestors.size - 2] = ancestors[0..-3].reject{ |ancestor| Resource === ancestor } if opts[:shallow]
       Route.new(path, action.to_s, ancestors, self)
@@ -235,7 +227,7 @@ module Trails
   end
 
   def namespace name, &block
-    @named_routes.merge! Scope.new(self, name).routes_hash(&block)
+    named_routes.merge! Scope.new(self, name).routes_hash(&block)
   end
 
   def map name, opts = {}, &block
@@ -252,45 +244,55 @@ module Trails
   end
 
   def route_for name
-    @named_routes[name].to_route
+    Trails.route_for(self, name).to_route
   end
 
   def path_for name, *args
-    @named_routes[name].to_path(*args)
+    Trails.route_for(self, name).to_path(*args)
   end
 
-  def trails
-    trails       = @named_routes.map { |name, route| [name, route.to_route]}
+  def print_routes
+    trails       = named_routes.map { |name, route| [name, route.to_route] }
     name_padding = trails.sort_by{ |e| e.first.size }.last.first.size + 3
     trails.each do |name, route|
       puts sprintf("%#{name_padding}s => %s", name, route) 
     end
   end
 
-  class << self
-    def routes_hash
-      Hash.new do |hash, key| 
-        if Symbol === key
-          hash[key.to_s]
-        else
-          raise RouteNotDefined.new("The route `#{key}` is not defined") 
-        end
-      end
-    end
-
-    def registered app
-      app.helpers Trails::Helpers
-      app.instance_variable_set :@named_routes, routes_hash
-    end
+  private
+  def named_routes
+    self::Routes.instance_variable_get :@routes
   end
 
   module Helpers
-    def path_for *args
-      self.class.path_for *args
+    def path_for name, *args
+      Trails.route_for(self.class, name).to_path(*args)
+    end
+     
+    def url_for *args 
+      url path_for(*args) 
+    end
+  end
+
+  class << self
+    def route_for klass, name
+      klass.ancestors.each do |ancestor| 
+        next unless ancestor.class == Module && ancestor.include?(Helpers)
+        if route = ancestor.instance_variable_get(:@routes)[name]
+          return route
+        end
+      end
+      raise RouteNotDefined.new("The route `#{name}` is not defined")
     end
 
-    def url_for *args
-      url path_for(*args)
+    def registered app
+      routes_module = Module.new do
+        include Helpers
+        @routes = Hash.new { |hash, key| hash[key.to_s] if Symbol === key }
+      end
+
+      app.const_set :Routes, routes_module
+      app.send :include, routes_module
     end
   end
 end
