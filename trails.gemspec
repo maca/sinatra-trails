@@ -8,8 +8,8 @@ Gem::Specification.new do |s|
   s.authors     = ["Macario"]
   s.email       = ["macarui@gmail.com"]
   s.homepage    = "http://github.com/maca/trails"
-  s.summary     = %q{TODO: Write a gem summary}
-  s.description = %q{TODO: Write a gem description}
+  s.summary     = %q{A named routes Sinatra DSL inspired by Rails routing}
+  s.description = %q{A named routes Sinatra DSL inspired by Rails routing}
 
   s.rubyforge_project = "trails"
   s.add_dependency 'sinatra'
