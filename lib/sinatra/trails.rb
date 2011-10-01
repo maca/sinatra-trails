@@ -57,7 +57,7 @@ module Sinatra
       def add_param key, capture
         unless keys.include? key
           @keys << key
-          @captures << capture
+          @captures << capture.to_s
         end
       end
     end
