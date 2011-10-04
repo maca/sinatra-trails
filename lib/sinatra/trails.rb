@@ -65,7 +65,7 @@ module Sinatra
     class ScopeMatcher
       def initialize scope, matchers
         @scope = scope
-        @names, @routes = matchers.partition { |el| Symbol === el }
+        @names, @matchers = matchers.partition { |el| Symbol === el }
       end
       
       def match str
@@ -77,19 +77,22 @@ module Sinatra
       end
 
       def routes
-        @matchers ||= 
-          if @routes.empty? && @names.empty?
+        @routes ||= 
+          if @matchers.empty? && @names.empty?
             @scope.routes 
           else
-            @routes + @names.map { |name| @scope[name] }
+            @matchers + @names.map { |name| @scope[name] }
           end
       end
 
       def actual_keys
-        @keys ||= routes.map{ |m| m.keys }.flatten
+        @actual_keys ||= routes.map{ |m| m.keys }.flatten
       end
 
-      def keys() self end
+      def keys
+        self
+      end
+
       def any?() actual_keys.any? end
       def zip(arr) actual_keys.zip(arr) end
     end
