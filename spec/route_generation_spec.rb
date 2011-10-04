@@ -490,6 +490,28 @@ describe 'trails' do
       end
     end
 
+    describe 'before filter costructing correct params' do
+      before :all do
+        app.instance_eval do
+          resources :users do
+            before(user) do
+              # puts params
+              @user = params[:id]
+            end
+
+            get user do
+              @user
+            end
+          end
+        end
+      end
+
+      it 'should set before filter for passed routes' do
+        get '/users/1'
+        last_response.body.should == '1'
+      end
+    end
+
     describe 'having access to resource name' do
       before :all do
         app.resources(:users => :posts) do

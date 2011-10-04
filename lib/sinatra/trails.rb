@@ -25,7 +25,8 @@ module Sinatra
         @to_route    = "/#{@components.join('/')}"
         namespace    = ancestors.reverse.find { |ancestor| ancestor.class == Scope && ancestor.name }
 
-        @to_regexp, @keys = Sinatra::Base.send(:compile, to_route)
+        @to_regexp, @keys = Sinatra::Base.send :compile, @to_route
+
         add_param 'resource', scope.name if [Resource, Resources].include?(scope.class)
         add_param 'namespace', namespace.name if namespace
         add_param 'action', name
@@ -55,26 +56,38 @@ module Sinatra
 
       private
       def add_param key, capture
-        unless keys.include? key
-          @keys << key
-          @captures << capture.to_s
-        end
+        @keys << key
+        @captures << capture.to_s
       end
     end
 
+    # This is hackish
     class ScopeMatcher
       def initialize scope, matchers
         @scope = scope
-        @names, @matchers = matchers.partition { |el| Symbol === el }
+        @names, @routes = matchers.partition { |el| Symbol === el }
       end
       
       def match str
-        if @matchers.empty? && @names.empty?
-          Regexp.union(@scope.routes).match str
-        else
-          Regexp.union(*@matchers, *@names.map{ |name| @scope[name] }).match str
-        end
+        Regexp.union(matchers).match str
       end
+
+      def matchers
+        @matchers ||= 
+          if @routes.empty? && @names.empty?
+            @scope.routes 
+          else
+            @routes + @names.map { |name| @scope[name] }
+          end
+      end
+
+      def actual_keys
+        @keys ||= matchers.map{ |m| m.keys }.flatten
+      end
+
+      def keys() self end
+      def any?() actual_keys.any? end
+      def zip(arr) actual_keys.zip(arr) end
     end
 
     class Scope
