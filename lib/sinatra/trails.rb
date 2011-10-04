@@ -69,10 +69,14 @@ module Sinatra
       end
       
       def match str
-        Regexp.union(matchers).match str
+        to_regexp.match str
       end
 
-      def matchers
+      def to_regexp
+        @to_regexp ||= Regexp.union(routes)
+      end
+
+      def routes
         @matchers ||= 
           if @routes.empty? && @names.empty?
             @scope.routes 
@@ -82,7 +86,7 @@ module Sinatra
       end
 
       def actual_keys
-        @keys ||= matchers.map{ |m| m.keys }.flatten
+        @keys ||= routes.map{ |m| m.keys }.flatten
       end
 
       def keys() self end
