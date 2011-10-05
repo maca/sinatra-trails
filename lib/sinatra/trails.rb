@@ -240,6 +240,13 @@ module Sinatra
         Route.new(path, action.to_s, ancestors, self)
       end
 
+      def map action
+        ancestors  = [*self.ancestors, plural_name, action]
+
+        ancestors[0, ancestors.size - 2] = ancestors[0..-3].reject{ |ancestor| Resource === ancestor } if opts[:shallow]
+        Route.new([plural_name, action], action.to_s, ancestors, self)
+      end
+
       private
       def define_routes
         collection(:index) and collection(:new)

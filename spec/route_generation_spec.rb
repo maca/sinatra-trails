@@ -155,12 +155,21 @@ describe 'trails' do
     describe 'basic' do
       before :all do
         app.resources :users, 'posts' do
-          # map :flag
         end
       end
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for posts'
-      # it { app.route_for(:flag).should == '/flag' }
+    end
+
+    describe 'as namespace' do
+      before :all do
+        app.resources :users do
+          map(:confirm)
+        end
+        puts app.print_routes
+      end
+      it_should_behave_like 'generates routes for users'
+      it { app.route_for(:users_confirm).should  == '/users/confirm' }
     end
 
     describe 'nested with block' do
@@ -495,7 +504,6 @@ describe 'trails' do
         app.instance_eval do
           resources :users do
             before(user) do
-              # puts params
               @user = params[:id]
             end
 
