@@ -13,7 +13,7 @@ describe 'trails' do
     describe 'basic' do
       before :all do
         app.map :home, :to => '/'
-        app.map :dashboard
+        app.map 'dashboard'
         app.map :edit_user, :to => '/users/:id/edit'
       end
 
@@ -166,7 +166,6 @@ describe 'trails' do
         app.resources :users do
           map(:confirm)
         end
-        puts app.print_routes
       end
       it_should_behave_like 'generates routes for users'
       it { app.route_for(:users_confirm).should  == '/users/confirm' }
@@ -314,16 +313,28 @@ describe 'trails' do
   end
 
   describe 'single resource' do
-    before :all do
-      app.resource :user => :profile
+    describe 'basic' do
+      before :all do
+        app.resource :user => :profile
+      end
+      it { app.route_for(:user).should               == '/user' }
+      it { app.route_for(:new_user).should           == '/user/new' }
+      it { app.route_for(:edit_user).should          == '/user/edit' }
+      it { app.route_for(:user_profile).should       == '/user/profile' }
+      it { app.route_for(:new_user_profile).should   == '/user/profile/new' }
+      it { app.route_for(:edit_user_profile).should  == '/user/profile/edit' }
     end
-    it { app.route_for(:user).should               == '/user' }
-    it { app.route_for(:new_user).should           == '/user/new' }
-    it { app.route_for(:edit_user).should          == '/user/edit' }
-    it { app.route_for(:user_profile).should       == '/user/profile' }
-    it { app.route_for(:new_user_profile).should   == '/user/profile/new' }
-    it { app.route_for(:edit_user_profile).should  == '/user/profile/edit' }
+
+    describe 'as namespace' do
+      before :all do
+        app.resource :user do
+          map(:confirm)
+        end
+      end
+      it { app.route_for(:user_confirm).should  == '/user/confirm' }
+    end
   end
+
 
   describe 'finding route for scope' do
     before :all do

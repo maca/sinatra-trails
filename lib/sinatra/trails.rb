@@ -89,10 +89,7 @@ module Sinatra
         @actual_keys ||= routes.map{ |m| m.keys }.flatten
       end
 
-      def keys
-        self
-      end
-
+      def keys() self end
       def any?() actual_keys.any? end
       def zip(arr) actual_keys.zip(arr) end
     end
@@ -108,8 +105,8 @@ module Sinatra
       end
 
       def map name, opts = {}, &block
-        path = opts.delete(:to) || name
-        route = Route.new(path, name, [*ancestors, self], self)
+        path  = opts.delete(:to) || name
+        route = Route.new(path, name.to_sym, [*ancestors, self], self)
         instance_eval &block if block_given?
         route
       end
@@ -129,6 +126,12 @@ module Sinatra
       def before *args, &block
         opts = Hash === args.last ? args.pop : {}
         @sinatra_app.before ScopeMatcher.new(self, args), opts, &block
+      end
+
+      def after *args, &block
+        # TODO: no specs
+        opts = Hash === args.last ? args.pop : {}
+        @sinatra_app.after ScopeMatcher.new(self, args), opts, &block
       end
 
       def generate_routes! &block
@@ -242,7 +245,6 @@ module Sinatra
 
       def map action
         ancestors  = [*self.ancestors, plural_name, action]
-
         ancestors[0, ancestors.size - 2] = ancestors[0..-3].reject{ |ancestor| Resource === ancestor } if opts[:shallow]
         Route.new([plural_name, action], action.to_s, ancestors, self)
       end
