@@ -154,8 +154,8 @@ describe 'trails' do
 
     describe 'basic' do
       before :all do
-        app.resources :users, 'posts' do
-        end
+        app.resources :users
+        app.resources :posts
       end
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for posts'
@@ -248,74 +248,14 @@ describe 'trails' do
       it_should_behave_like 'generates routes for users'
       it_should_behave_like 'generates routes for shallow user posts'
     end
-
-    describe 'hash nested' do
-      before :all do
-        app.resources :users => :posts
-      end
-      it_should_behave_like 'generates routes for users'
-      it_should_behave_like 'generates routes for nested user posts'
-    end
-
-    describe 'hash nested with block' do
-      before :all do
-        app.resources :users => :posts do
-          map :flag
-        end
-      end
-      it_should_behave_like 'generates routes for users'
-      it_should_behave_like 'generates routes for nested user posts'
-      it { app.route_for(:flag).should == '/flag' }
-    end
-
-    describe 'nested shallow with hash' do
-      before :all do
-        app.resources :users => :posts, :shallow => true
-      end
-      it_should_behave_like 'generates routes for users'
-      it_should_behave_like 'generates routes for shallow user posts'
-    end
-
-    describe 'deep nested with hash' do
-      before :all do
-        app.resources :users => {:posts => :comments}
-      end
-      it_should_behave_like 'generates routes for users'
-      it_should_behave_like 'generates routes for nested user posts'
-      describe 'exageration' do
-        it { app.route_for(:user_post_comments).should     == '/users/:user_id/posts/:post_id/comments' }
-        it { app.route_for(:new_user_post_comment).should  == '/users/:user_id/posts/:post_id/comments/new' }
-        it { app.route_for(:user_post_comment).should      == '/users/:user_id/posts/:post_id/comments/:id' }
-        it { app.route_for(:edit_user_post_comment).should == '/users/:user_id/posts/:post_id/comments/:id/edit' }
-      end
-    end
-    
-    describe 'deep nested shallow with hash' do
-      before :all do
-        app.resources :users => {:posts => :comments}, :shallow => true
-      end
-      it_should_behave_like 'generates routes for users'
-      it_should_behave_like 'generates routes for shallow user posts'
-      it { app.route_for(:post_comments).should     == '/posts/:post_id/comments' }
-      it { app.route_for(:new_post_comment).should  == '/posts/:post_id/comments/new' }
-      it { app.route_for(:comment).should           == '/comments/:id' }
-      it { app.route_for(:edit_comment).should      == '/comments/:id/edit' }
-    end
-
-    describe 'nested with array' do
-      before :all do
-        app.resources :users => [:posts, :comments]
-      end
-      it { app.route_for(:users).should           == '/users' }
-      it { app.route_for(:user_comments).should   == '/users/:user_id/comments' }
-      it { app.route_for(:user_posts).should      == '/users/:user_id/posts' }
-    end
   end
 
   describe 'single resource' do
     describe 'basic' do
       before :all do
-        app.resource :user => :profile
+        app.resource :user do
+          resource :profile
+        end
       end
       it { app.route_for(:user).should               == '/user' }
       it { app.route_for(:new_user).should           == '/user/new' }
@@ -386,30 +326,6 @@ describe 'trails' do
       it "should get url for route" do
         get '/about'
         last_response.body.should == 'http://example.org/about'
-      end
-    end
-
-    describe 'using route as scope' do
-      before :all do
-        app.resources(:users => :posts, :shallow => true) do
-          users do
-            get(member(:aprove)) { path_for(:aprove_user, params[:id]) }
-          end
-
-          user_posts do
-            get(member(:aprove)) { path_for(:aprove_post, params[:id]) }
-          end
-        end
-      end
-
-      it 'should define action for users member' do
-        get '/users/1/aprove'
-        last_response.body.should == '/users/1/aprove'
-      end
-
-      it 'should define action for user_posts member' do
-        get '/posts/1/aprove'
-        last_response.body.should == '/posts/1/aprove'
       end
     end
 
@@ -533,9 +449,11 @@ describe 'trails' do
 
     describe 'having access to resource name' do
       before :all do
-        app.resources(:users => :posts) do
+        app.resources :users do
           get(users){ params[:resource].to_s }
-          get(user_posts){ params[:resource].to_s }
+          resources :posts do
+            get(user_posts){ params[:resource].to_s }
+          end
         end
       end
 

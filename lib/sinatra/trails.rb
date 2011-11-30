@@ -115,12 +115,12 @@ module Sinatra
         @routes += Scope.new(@sinatra_app, path, [*ancestors, self]).generate_routes!(&block)
       end
 
-      def resource *names, &block
-        restful_routes Resource, names, &block
+      def resource name, opts = {}, &block
+        restful_routes Resource, name, opts, &block
       end
 
-      def resources *names, &block
-        restful_routes Resources, names, &block
+      def resources name, opts = {}, &block
+        restful_routes Resources, name, opts, &block
       end
 
       def before *args, &block
@@ -151,50 +151,16 @@ module Sinatra
 
       private
       def method_missing name, *args, &block
-        return @sinatra_app.send(name, *args, &block) if @sinatra_app.respond_to?(name)
-        if route = route_for(name)
-          return route unless block_given?
-          @routes = @routes | route.scope.generate_routes!(&block)
+        if @sinatra_app.respond_to? name
+          @sinatra_app.send name, *args, &block 
         else
-          super
+          route_for(name) or super
         end
       end
 
-      def restful_routes builder, names, &block
-        opts = {}
-        hash = Hash === names.last ? names.pop : {}
-        hash.delete_if { |key, val| opts[key] = val if !(Symbol === val || Enumerable === val) }
-
-        nested = []
-        mash = Proc.new do |hash, acc|
-          hash.map do |key, val| 
-            case val
-            when Hash
-              [*acc, key, *mash.call(val, key).flatten]
-            when Array
-              nested += val.map{ |r| [*acc, key, r] } and next
-            else
-              [key, val]
-            end
-          end 
-        end
-
-        hash = (mash.call(hash) + nested).compact.map do |array|
-          array.reverse.inject(Proc.new{}) do |proc, name|
-            Proc.new{ send(builder == Resource ? :resource : :resources, name, opts, &proc) }
-          end.call
-        end
-
-        make = lambda do |name|
-          builder.new(@sinatra_app, name, [*ancestors, self], (@opts || {}).merge(opts))
-        end
-
-        if names.size == 1 && hash.empty?
-          @routes += make.call(names.first).generate_routes!(&block)
-        else
-          names.each { |name| @routes += make.call(name).generate_routes! }
-          instance_eval &block if block_given?
-        end
+      def restful_routes builder, name, opts, &block
+        scope = builder.new(@sinatra_app, name, [*ancestors, self], (@opts || {}).merge(opts))
+        @routes += scope.generate_routes!(&block)
       end
     end
 

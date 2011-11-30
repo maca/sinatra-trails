@@ -63,7 +63,7 @@ All defined routes will be available in the views and action blocks:
 
 ## Namespaces
 
-Pasing a symbol namespaces both the path and the route name:
+Passing a symbol namespaces both the path and the route name:
 
     namespace :admin do
       map(:dashboard)
@@ -128,6 +128,18 @@ definition block a route can be accessed by its name as a method call or using t
       delete user do
         ...
       end
+      
+      # generates new route with name :aprove_user
+      # GET /users/:id/aprove
+      get member(:aprove) do
+        ...
+      end
+
+      # generates new route with name :aproved_users
+      # GET /users/aproved
+      get collection(:aproved) do
+        ...
+      end
     end
 
 It is important to note that the order in wich the sinatra action blocks are defined is important.
@@ -187,25 +199,6 @@ And for actions that don't need to load the parent resource the route generation
     # new_user_comment => /users/:user_id/comments/new
     #          comment => /comments/:id
     #     edit_comment => /comments/:id/edit 
-
-There's an alternative way of generating routes for nested resources:
-
-    resources :users => {:posts => :comments}, :shallow => true do
-      ...
-    end
-    print_routes
-    #             users => /users
-    #          new_user => /users/new
-    #              user => /users/:id
-    #         edit_user => /users/:id/edit
-    #        user_posts => /users/:user_id/posts
-    #     new_user_post => /users/:user_id/posts/new
-    #              post => /posts/:id
-    #         edit_post => /posts/:id/edit
-    #     post_comments => /posts/:post_id/comments
-    #  new_post_comment => /posts/:post_id/comments/new
-    #           comment => /comments/:id
-    #      edit_comment => /comments/:id/edit  
 
 Some keys to the params hash are added when routes are defined using sinatra-trails:
     
