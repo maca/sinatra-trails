@@ -142,8 +142,7 @@ definition block a route can be accessed by its name as a method call or using t
       end
     end
 
-It is important to note that the order in wich the sinatra action blocks are defined is important.
-in this case `get(new_user)` must be defined before `get(user)`
+Route definition order for sinatra has precedence, in this case `get(new_user)` must be defined before `get(user)`
 
 As with previous examples routes can be defined beforehand:
 
@@ -156,7 +155,7 @@ As with previous examples routes can be defined beforehand:
 
 ## Nested Resources
 
-Resources can be nested in a similar way as with Rails nested resources:
+Resources can be nested in a similar way as with Rails:
   
     resources :users do
       ...
