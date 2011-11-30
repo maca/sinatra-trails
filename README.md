@@ -19,9 +19,9 @@ Named routes are generated with map, not passing :to option sets the path to be 
     class MyApp < Sinatra::Base
       register Sinatra::Trails
 
-      map :dashboard                 # => '/dashboard'
-      map :home, :to => '/'          # => '/'
-      map :post, :to => '/posts/:id' # => '/posts/:id'
+      map :dashboard
+      map :home, :to => '/'
+      map :post, :to => '/posts/:id'
     end
 
     MyApp.print_routes
