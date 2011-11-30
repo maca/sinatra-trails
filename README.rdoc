@@ -1,20 +1,16 @@
-sinatra-trails
---------------
+# sinatra-trails
 
-Is a very thin Rails inspired route naming DSL for using with Sinatra apps.
+Is a very thin Rails inspired route naming DSL for using with Sinatra apps. 
 It doesn't monkeypatch or overrides any Sinatra::Base methods 
 It provides helpers for generating routes for resources and single resource, namespaces and named routes.
 
-Instalation
-----------
+# Instalation
 
     $ [sudo] gem install sinatra-trails
 
-Usage
-----
+# Usage
 
-Basic
-=====
+## Basic
 
 Named routes are generated with map, not passing :to option sets the path to be the same as the name:
 
@@ -65,8 +61,7 @@ All defined routes will be available in the views and action blocks:
     end 
 
 
-Namespaces
-==========
+## Namespaces
 
 Pasing a symbol namespaces both the path and the route name:
 
@@ -93,8 +88,7 @@ Passing nil to namespace only sets a context:
     route_for(:dashboard) # => '/dashboard'
 
 
-Resources
-=========
+## Resources
   
 Restful routes for plural resources can be generated as follows, inside the resource
 definition block a route can be accessed by its name as a method call or using the path_for method:
@@ -148,8 +142,7 @@ As with previous examples routes can be defined beforehand:
     end
 
 
-Nested Resources
-================
+## Nested Resources
 
 Resources can be nested in a similar way as with Rails nested resources:
   
@@ -221,8 +214,7 @@ Some keys to the params hash are added when routes are defined using sinatra-tra
     params[:namespace] # the name of the current namespace
 
 
-Singleton Resource
-=================
+## Singleton Resource
 
 Same principles apply for singleton resource:
     
@@ -233,8 +225,7 @@ Same principles apply for singleton resource:
     #  edit_user => /user/edit
 
 
-Before and After Filters
-========================
+## Before and After Filters
 
 Defining a filter within a context (namespace, resources, resource) without passing any path will execute that filter for
 all actions defined in that context:
@@ -273,9 +264,7 @@ A symbol can be passed to the filter definition and it will be lazily evaluated 
       end
     end
 
-
-Accessing Routes from Outside the App
-=====================================
+## Accessing Routes from Outside the App
 
 On registering Sinatra::Trails a dynamic module for the Sinatra app is created and it is assigned to the constant `Routes`
 including that module in another class gives that class access to the app's paths, a single class can access paths for
